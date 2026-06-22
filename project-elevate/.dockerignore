@@ -1,0 +1,12 @@
+node_modules
+.output
+dist
+.nitro
+.tanstack
+data
+public/media
+*.local
+.env.local
+.env.*.local
+.git
+.wrangler
