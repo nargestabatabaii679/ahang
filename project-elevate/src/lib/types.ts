@@ -78,8 +78,8 @@ export interface Job {
   result?: {
     videoUrl?: string;
     audioUrl?: string;
+    musicUrl?: string;
     lyrics?: string;
-    /** the literal spectrogram image the music model diffused — used as cover art */
     coverArtUrl?: string;
   };
   createdAt: number;

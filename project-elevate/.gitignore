@@ -24,6 +24,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+# SQLite database and uploaded media (runtime data)
+data/
+public/media/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

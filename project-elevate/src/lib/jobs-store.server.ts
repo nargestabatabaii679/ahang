@@ -1,90 +1,109 @@
 /**
- * Persistent job store, backed by Lovable Cloud (Supabase).
- *
- * Server-only. Replaces the in-memory Map from the Next.js version —
- * Cloudflare Worker invocations are stateless across requests, so an
- * in-memory store would lose jobs as soon as the response was sent.
+ * Job store backed by a local SQLite file (data/jobs.db).
+ * Drop-in replacement for the Supabase-backed version — same exports,
+ * same behaviour, zero external services required.
  */
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  Job,
-  JobStatus,
-  StageId,
-  StageStatus,
-  STAGE_ORDER,
-} from "./types";
+import Database from "better-sqlite3";
+import { mkdirSync } from "fs";
+import { join } from "path";
+import { Job, JobStatus, StageId, StageStatus, STAGE_ORDER } from "./types";
 
-const TABLE = "jobs";
+// Keep the DB file next to the project root, outside src/
+const DB_DIR = join(process.cwd(), "data");
+mkdirSync(DB_DIR, { recursive: true });
+const DB_PATH = join(DB_DIR, "jobs.db");
+
+let _db: Database.Database | null = null;
+function db(): Database.Database {
+  if (!_db) {
+    _db = new Database(DB_PATH);
+    _db.pragma("journal_mode = WAL");
+    _db.pragma("synchronous = NORMAL");
+    _db.exec(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id          TEXT PRIMARY KEY,
+        status      TEXT NOT NULL DEFAULT 'queued',
+        brief       TEXT NOT NULL,
+        stages      TEXT NOT NULL,
+        progress    INTEGER NOT NULL DEFAULT 0,
+        error       TEXT,
+        result      TEXT NOT NULL DEFAULT '{}',
+        created_at  INTEGER NOT NULL
+      )
+    `);
+  }
+  return _db;
+}
 
 type Row = {
   id: string;
   status: JobStatus;
-  brief: Job["brief"];
-  stages: Job["stages"];
+  brief: string;
+  stages: string;
   progress: number;
   error: string | null;
-  result: NonNullable<Job["result"]>;
-  created_at: string;
+  result: string;
+  created_at: number;
 };
 
 function rowToJob(row: Row): Job {
   return {
     id: row.id,
     status: row.status,
-    brief: row.brief,
-    stages: row.stages,
+    brief: JSON.parse(row.brief),
+    stages: JSON.parse(row.stages),
     progress: row.progress,
     error: row.error ?? undefined,
-    result: row.result,
-    createdAt: new Date(row.created_at).getTime(),
+    result: JSON.parse(row.result),
+    createdAt: row.created_at,
   };
 }
 
 export async function createJob(job: Job): Promise<Job> {
-  const { error } = await supabaseAdmin.from(TABLE).insert({
-    id: job.id,
-    status: job.status,
-    brief: job.brief as never,
-    stages: job.stages as never,
-    progress: job.progress,
-    result: (job.result ?? {}) as never,
-  });
-  if (error) throw new Error(`createJob failed: ${error.message}`);
+  db().prepare(`
+    INSERT INTO jobs (id, status, brief, stages, progress, error, result, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    job.id,
+    job.status,
+    JSON.stringify(job.brief),
+    JSON.stringify(job.stages),
+    job.progress,
+    job.error ?? null,
+    JSON.stringify(job.result ?? {}),
+    job.createdAt,
+  );
   return job;
 }
 
 export async function getJob(id: string): Promise<Job | undefined> {
-  const { data, error } = await supabaseAdmin
-    .from(TABLE)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(`getJob failed: ${error.message}`);
-  return data ? rowToJob(data as unknown as Row) : undefined;
+  const row = db().prepare("SELECT * FROM jobs WHERE id = ?").get(id) as Row | undefined;
+  return row ? rowToJob(row) : undefined;
 }
 
 export async function updateJob(id: string, patch: Partial<Job>) {
-  const dbPatch: Record<string, unknown> = {};
-  if (patch.status !== undefined) dbPatch.status = patch.status;
-  if (patch.brief !== undefined) dbPatch.brief = patch.brief;
-  if (patch.stages !== undefined) dbPatch.stages = patch.stages;
-  if (patch.progress !== undefined) dbPatch.progress = patch.progress;
-  if (patch.error !== undefined) dbPatch.error = patch.error;
-  if (patch.result !== undefined) dbPatch.result = patch.result;
-  await supabaseAdmin.from(TABLE).update(dbPatch as never).eq("id", id);
+  const row = db().prepare("SELECT * FROM jobs WHERE id = ?").get(id) as Row | undefined;
+  if (!row) return;
+  const merged: Row = {
+    ...row,
+    status:   (patch.status   ?? row.status) as JobStatus,
+    brief:    patch.brief  !== undefined ? JSON.stringify(patch.brief)   : row.brief,
+    stages:   patch.stages !== undefined ? JSON.stringify(patch.stages)  : row.stages,
+    progress: patch.progress ?? row.progress,
+    error:    patch.error !== undefined ? (patch.error ?? null) : row.error,
+    result:   patch.result !== undefined ? JSON.stringify(patch.result)  : row.result,
+  };
+  db().prepare(`
+    UPDATE jobs SET status=?, brief=?, stages=?, progress=?, error=?, result=?
+    WHERE id=?
+  `).run(merged.status, merged.brief, merged.stages, merged.progress, merged.error, merged.result, id);
 }
 
-export async function setStage(
-  id: string,
-  stage: StageId,
-  status: StageStatus
-) {
+export async function setStage(id: string, stage: StageId, status: StageStatus) {
   const job = await getJob(id);
   if (!job) return;
-  const stages = job.stages.map((s) =>
-    s.id === stage ? { ...s, status } : s
-  );
+  const stages = job.stages.map((s) => (s.id === stage ? { ...s, status } : s));
   const total = STAGE_ORDER.length;
   const done = stages.filter((x) => x.status === "done").length;
   const running = stages.filter((x) => x.status === "running").length;
@@ -92,11 +111,7 @@ export async function setStage(
   await updateJob(id, { stages, progress });
 }
 
-export async function setJobStatus(
-  id: string,
-  status: JobStatus,
-  error?: string
-) {
+export async function setJobStatus(id: string, status: JobStatus, error?: string) {
   const patch: Partial<Job> = { status };
   if (error) patch.error = error;
   if (status === "done") patch.progress = 100;
