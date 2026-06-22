@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 export const getGiftJob = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => z.object({ id: z.string() }).parse(data))
+  .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
     const { getJob } = await import("@/lib/jobs-store.server");
     const job = await getJob(data.id);
