@@ -79,6 +79,7 @@ export interface Job {
     videoUrl?: string;
     audioUrl?: string;
     musicUrl?: string;
+    musicError?: string;
     lyrics?: string;
     coverArtUrl?: string;
   };
