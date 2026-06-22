@@ -1,0 +1,187 @@
+/**
+ * Server-only orchestrator for the song-generation pipeline.
+ *
+ * Differences from the Next.js original:
+ *   - Persistence via Lovable Cloud (jobs-store.server) instead of a Map.
+ *   - All file I/O via Lovable Cloud Storage (storage.server).
+ *   - No ffmpeg / no Node `child_process`: voice/music are not mixed; the
+ *     final audio is the cloned-voice render (or the user's own sample
+ *     when the cloning service is unavailable). The video stage uses
+ *     Creatify (HTTP) when configured; otherwise it's skipped and the
+ *     result is audio + cover art + lyrics.
+ *   - Lyrics stage uses the Lovable AI Gateway (Gemini Flash) so even with
+ *     zero external API keys configured, every job produces real output.
+ */
+
+import { Job } from "./types";
+import { setStage, setJobStatus, updateJob, getJob } from "./jobs-store.server";
+import { savePublic, fetchBytes } from "./storage.server";
+import { draftLyrics, buildMusicPrompt } from "./providers/lyrics";
+import {
+  cloneVoice,
+  synthesize,
+  deleteVoice,
+  mimeFromExt,
+} from "./providers/elevenlabs";
+import { generateMusic } from "./providers/suno";
+import { generateMusicWithArt } from "./providers/riffusion";
+import { lipSyncVideo as lipSyncAurora } from "./providers/creatify";
+import { generateAvatarVideo } from "./providers/heygen";
+import { sleep } from "./server-utils";
+
+const isMock = () => process.env.PIPELINE_MOCK === "true";
+const musicProvider = () => process.env.MUSIC_PROVIDER || "riffusion";
+const videoProvider = () => process.env.VIDEO_PROVIDER || "aurora";
+
+interface MusicStageResult {
+  musicUrl?: string;
+  coverArtUrl?: string;
+}
+
+async function runLyricsStage(job: Job): Promise<string> {
+  await setStage(job.id, "lyrics", "running");
+  const lyrics = await draftLyrics(job.brief);
+  if (isMock()) await sleep(1200);
+  await setStage(job.id, "lyrics", "done");
+  return lyrics;
+}
+
+async function runMusicStage(job: Job): Promise<MusicStageResult> {
+  await setStage(job.id, "music", "running");
+  let result: MusicStageResult = {};
+
+  if (isMock()) {
+    await sleep(900);
+  } else {
+    try {
+      if (musicProvider() === "riffusion") {
+        const { audio, coverArt } = await generateMusicWithArt(job.brief);
+        result.musicUrl = (await savePublic(`${job.id}-music.mp3`, audio)).url;
+        result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, coverArt)).url;
+      } else {
+        result.musicUrl = await generateMusic(buildMusicPrompt(job.brief));
+      }
+    } catch (e) {
+      console.warn(
+        `[pipeline] music provider failed (${(e as Error)?.message}); falling back to no instrumental`
+      );
+    }
+  }
+
+  // No spectrogram? fall back to the uploaded photo as cover art.
+  if (!result.coverArtUrl && job.brief.photoUrl) {
+    result.coverArtUrl = job.brief.photoUrl;
+  }
+
+  await setStage(job.id, "music", "done");
+  return result;
+}
+
+async function runVoiceStage(
+  job: Job,
+  lyrics: string,
+  musicUrl?: string
+): Promise<string | undefined> {
+  await setStage(job.id, "voice", "running");
+  let audioUrl: string | undefined;
+
+  if (isMock()) {
+    audioUrl = job.brief.voiceUrl || musicUrl;
+    await sleep(1200);
+  } else {
+    try {
+      if (!job.brief.voiceUrl) throw new Error("نمونهٔ صدا موجود نیست");
+      const sample = await fetchBytes(job.brief.voiceUrl);
+      const voiceId = await cloneVoice(
+        job.brief.recipientName,
+        sample,
+        mimeFromExt(job.brief.voiceUrl)
+      );
+      try {
+        const audio = await synthesize(voiceId, lyrics);
+        audioUrl = (await savePublic(`${job.id}-final.mp3`, audio)).url;
+      } finally {
+        await deleteVoice(voiceId);
+      }
+    } catch (e) {
+      console.warn(
+        `[pipeline] voice clone failed (${(e as Error)?.message}); falling back to raw uploaded sample`
+      );
+      audioUrl = job.brief.voiceUrl || musicUrl;
+    }
+  }
+
+  await setStage(job.id, "voice", "done");
+  return audioUrl;
+}
+
+async function runVideoStage(
+  job: Job,
+  audioUrl?: string
+): Promise<string | undefined> {
+  await setStage(job.id, "video", "running");
+  let videoUrl: string | undefined;
+  const photoUrl = job.brief.photoUrl;
+
+  if (!isMock()) {
+    try {
+      if (videoProvider() === "heygen") {
+        const fresh = await getJob(job.id);
+        const lyrics = fresh?.result?.lyrics || "";
+        const buf = await generateAvatarVideo(lyrics);
+        videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
+      } else if (photoUrl && audioUrl && videoProvider() === "aurora") {
+        const buf = await lipSyncAurora(photoUrl, audioUrl);
+        videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
+      }
+    } catch (e) {
+      console.warn(
+        `[pipeline] video provider failed (${(e as Error)?.message}); skipping video`
+      );
+    }
+  }
+  if (isMock()) await sleep(900);
+
+  await setStage(job.id, "video", "done");
+  return videoUrl;
+}
+
+export async function runPipeline(jobId: string) {
+  const job = await getJob(jobId);
+  if (!job) return;
+
+  await setJobStatus(job.id, "running");
+  let result: NonNullable<Job["result"]> = {};
+  try {
+    const lyrics = await runLyricsStage(job);
+    result = { ...result, lyrics };
+    await updateJob(job.id, { result });
+
+    const music = await runMusicStage(job);
+    result = {
+      ...result,
+      coverArtUrl: music.coverArtUrl,
+    };
+    await updateJob(job.id, { result });
+
+    const audioUrl = await runVoiceStage(job, lyrics, music.musicUrl);
+    result = { ...result, audioUrl };
+    await updateJob(job.id, { result });
+
+    const videoUrl = await runVideoStage(job, audioUrl);
+    result = { ...result, videoUrl };
+    await updateJob(job.id, { result });
+
+    await setStage(job.id, "finalize", "running");
+    if (isMock()) await sleep(600);
+    await setStage(job.id, "finalize", "done");
+
+    await setJobStatus(job.id, "done");
+  } catch (e) {
+    const message = (e as Error)?.message || "خطای ناشناخته در تولید";
+    const fresh = await getJob(job.id);
+    const stage = fresh?.stages.find((s) => s.status === "running");
+    if (stage) await setStage(job.id, stage.id, "error");
+    await setJobStatus(job.id, "error", message);
+  }
+}
