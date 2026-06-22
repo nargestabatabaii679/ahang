@@ -1,0 +1,213 @@
+@import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: "Vazirmatn";
+    --font-display: "Vazirmatn"; /* same family, used only at black weight + tight tracking */
+    --font-counter: "JetBrains Mono"; /* the cassette tape-counter digits */
+
+    /* Mixtape theme — a plum-ink room at night, lit by the amber glow of a
+       tape deck, with a coral ribbon thread tying everything together. */
+    --background: 263 38% 9%;
+    --foreground: 38 30% 95%;
+
+    --card: 261 33% 13%;
+    --card-foreground: 38 30% 95%;
+
+    --muted: 260 22% 19%;
+    --muted-foreground: 270 12% 68%;
+
+    --primary: 38 78% 60%; /* tape amber, desaturated */
+    --primary-foreground: 263 45% 10%;
+
+    --secondary: 260 26% 21%;
+    --secondary-foreground: 38 30% 95%;
+
+    --accent: 7 75% 63%; /* coral thread, desaturated */
+    --accent-foreground: 263 45% 10%;
+
+    --border: 260 22% 23%;
+    --input: 260 22% 23%;
+    --ring: 7 75% 63%;
+
+    --radius: 1.25rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01";
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    /* Ambient deck-light glow: amber lamp, coral indicator LED */
+    background-image:
+      radial-gradient(50rem 34rem at 90% -6%, hsl(38 90% 28% / 0.22), transparent 60%),
+      radial-gradient(42rem 36rem at 4% 104%, hsl(7 70% 32% / 0.18), transparent 60%),
+      radial-gradient(70rem 50rem at 50% 50%, hsl(263 38% 11% / 1), hsl(263 38% 7% / 1) 70%);
+    background-attachment: fixed;
+  }
+
+  /* Persian digits look better with tabular spacing in data contexts */
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-display {
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  /* The tape-counter face — used only for the rolling numeric readouts
+     on ticket stubs, never for body copy, so it reads as a real counter. */
+  .font-counter {
+    font-family: var(--font-counter), monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Amber→coral gradient text — the lit VU-meter of the page */
+  .text-aurora {
+    background-image: linear-gradient(100deg, #f3cd8a 0%, #e9ae49 45%, #e76a5a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glass {
+    background: linear-gradient(160deg, hsl(261 33% 15% / 0.88), hsl(261 33% 10% / 0.88));
+    backdrop-filter: blur(16px);
+    border: 1px solid hsl(260 22% 30% / 0.5);
+  }
+
+  .glow-ring {
+    box-shadow:
+      0 0 0 1px hsl(7 75% 60% / 0.16),
+      0 18px 60px -18px hsl(38 78% 52% / 0.35);
+  }
+
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Signature element: the mixtape ticket ──────────────────────────
+     A paper-colored stub with a punched perforation edge down one side,
+     like the tear-off label of a cassette case. This is the one piece
+     of real visual risk the page spends: it appears in the hero and
+     again on the result screen, so the gift always looks like a tape
+     someone labeled by hand. */
+  .ticket {
+    position: relative;
+    background: theme("colors.paper.DEFAULT");
+    color: #2b2118;
+    border-radius: 1.5rem;
+  }
+
+  /* The perforated tear-line — a strip of punched dots, used as the
+     divider between a ticket's "label" half and its "waveform" half. */
+  .ticket-perf {
+    width: 0;
+    border-right: 2px dashed hsl(38 25% 24% / 0.35);
+    -webkit-mask-image: repeating-linear-gradient(
+      to bottom,
+      black 0,
+      black 6px,
+      transparent 6px,
+      transparent 13px
+    );
+    mask-image: repeating-linear-gradient(
+      to bottom,
+      black 0,
+      black 6px,
+      transparent 6px,
+      transparent 13px
+    );
+  }
+
+  /* punch-holes at the ticket's two ends, like a real stub */
+  .ticket-notch::before,
+  .ticket-notch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    background: hsl(263 38% 8%);
+    border-radius: 999px;
+    transform: translateY(-50%);
+  }
+  .ticket-notch::before {
+    left: -11px;
+  }
+  .ticket-notch::after {
+    right: -11px;
+  }
+
+  /* Single taut thread, a quiet rhyme with the ticket's stitched edge */
+  .thread-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(7 100% 69% / 0.55) 20%,
+      hsl(38 100% 63% / 0.7) 50%,
+      hsl(7 100% 69% / 0.55) 80%,
+      transparent 100%
+    );
+  }
+}
+
+/* Respect the user's reduced-motion preference (Accessibility, CRITICAL) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reduce the 300ms tap delay on touch devices (Touch & Interaction) */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(263 38% 9%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(260 20% 26%);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(38 60% 42%);
+}
