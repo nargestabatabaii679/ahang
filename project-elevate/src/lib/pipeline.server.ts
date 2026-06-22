@@ -16,12 +16,13 @@
 import { Job } from "./types";
 import { setStage, setJobStatus, updateJob, getJob } from "./jobs-store.server";
 import { savePublic, fetchBytes } from "./storage.server";
-import { draftLyrics, buildMusicPrompt, buildCoverArtPrompt } from "./providers/lyrics";
+import { draftLyrics, buildMusicPrompt, buildCoverArtPrompt, buildELMusicPrompt } from "./providers/lyrics";
 import {
   cloneVoice,
   synthesize,
   deleteVoice,
   mimeFromExt,
+  generateMusicEL,
 } from "./providers/elevenlabs";
 import { generateMusic } from "./providers/suno";
 import { generateMusicWithArt } from "./providers/riffusion";
@@ -81,9 +82,22 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
         result.musicUrl = remoteUrl;
       }
     } catch (e) {
-      console.warn(
-        `[pipeline] music provider failed (${(e as Error)?.message}); falling back to no instrumental`
-      );
+      console.warn(`[pipeline] music provider failed (${(e as Error)?.message}); trying ElevenLabs Sound Generation...`);
+      if (process.env.ELEVENLABS_API_KEY) {
+        try {
+          const buf = await generateMusicEL(buildELMusicPrompt(job.brief));
+          result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
+          // Try Stability cover art after EL music
+          if (process.env.STABILITY_API_KEY && !result.coverArtUrl) {
+            try {
+              const img = await generateCoverArt(buildCoverArtPrompt(job.brief));
+              result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
+            } catch { /* non-fatal */ }
+          }
+        } catch (e2) {
+          console.warn(`[pipeline] ElevenLabs music failed: ${(e2 as Error).message}`);
+        }
+      }
     }
   }
 

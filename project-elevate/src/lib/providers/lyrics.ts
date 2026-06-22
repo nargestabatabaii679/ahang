@@ -357,3 +357,24 @@ export function buildCoverArtPrompt(brief: SongBrief): string {
     `Ultra high quality, professional music album cover, sharp details, stunning visuals.`,
   ].join(" ");
 }
+
+// ── ElevenLabs Sound Generation prompt ────────────────────────────────────
+
+const genreELMusic: Record<Genre, string> = {
+  romantic:
+    "Soft romantic instrumental background music. Grand piano melody with gentle cello and warm strings. Slow 65 BPM. No vocals. Tender and intimate atmosphere. Studio quality.",
+  emotional:
+    "Emotional piano ballad instrumental. Solo upright piano, sparse strings. Very slow 55 BPM. No vocals. Melancholic yet beautiful. Close-miked intimate sound.",
+  happy:
+    "Upbeat joyful instrumental background music. Bright piano, hand claps, acoustic guitar strumming. 115 BPM major key. No vocals. Cheerful and energetic.",
+  calm:
+    "Calm peaceful acoustic instrumental. Soft fingerpicked nylon guitar, gentle kalimba. 78 BPM. No vocals. Meditative and serene atmosphere. Natural room tone.",
+  motivational:
+    "Epic cinematic orchestral instrumental. Triumphant strings, French horn, building percussion. 100 BPM. No vocals. Inspiring and powerful. Cinematic quality.",
+  nostalgic:
+    "Nostalgic retro instrumental. Warm Rhodes piano, soft bass, brushed snare. 82 BPM. No vocals. Vintage tape warmth. Wistful and tender.",
+};
+
+export function buildELMusicPrompt(brief: SongBrief): string {
+  return genreELMusic[brief.genre];
+}
