@@ -201,6 +201,7 @@ export async function runPipeline(jobId: string) {
     const music = await runMusicStage(job);
     result = {
       ...result,
+      musicUrl: music.musicUrl,
       coverArtUrl: music.coverArtUrl,
     };
     await updateJob(job.id, { result });

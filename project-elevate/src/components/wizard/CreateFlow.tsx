@@ -86,6 +86,7 @@ export function CreateFlow() {
   const [result, setResult] = useState<{
     videoUrl?: string;
     audioUrl?: string;
+    musicUrl?: string;
     lyrics?: string;
     coverArtUrl?: string;
   }>({});
@@ -274,20 +275,20 @@ export function CreateFlow() {
             {step === 2 && (
               <div className="space-y-7">
                 <Header
-                  title="خودت را وارد این آهنگ کن"
-                  subtitle="یک عکس و یک نمونه‌صدا، تا آهنگ واقعاً با چهره و صدای او باشد."
+                  title="صدا و تصویر"
+                  subtitle="یک نمونه‌صدا بارگذاری کن — هوش مصنوعی آن را کلون می‌کند و ترانه را با همان صدا می‌خواند."
                 />
                 <div className="space-y-2">
-                  <Label>عکس خودت</Label>
+                  <Label>عکس (برای کاور و ویدیو)</Label>
                   <p className="-mt-1 text-xs text-muted-foreground">
-                    یک عکس واضح از چهره‌ات انتخاب کن.
+                    یک عکس واضح از چهره انتخاب کن.
                   </p>
                   <PhotoUpload file={photo} onChange={setPhoto} />
                 </div>
                 <div className="space-y-2">
-                  <Label>صدای خودت</Label>
+                  <Label>نمونه‌صدا برای کلون کردن</Label>
                   <p className="-mt-1 text-xs text-muted-foreground">
-                    حدود ۳۰ تا ۶۰ ثانیه صحبت کردن کافی است.
+                    ۳۰ تا ۶۰ ثانیه صحبت طبیعی — هوش مصنوعی همین صدا را برای خواندن ترانه کلون می‌کند.
                   </p>
                   <VoiceInput file={voice} onChange={setVoice} />
                 </div>
@@ -300,9 +301,9 @@ export function CreateFlow() {
                     className="mt-0.5 h-5 w-5 shrink-0 rounded border-border bg-transparent accent-tape"
                   />
                   <span>
-                    تأیید می‌کنم از این عکس و صدا فقط برای ساخت همین آهنگ استفاده می‌شود؛
-                    یعنی یا خودم هستم، یا شخصی که در عکس و صداست به من اجازه داده ویدیویی
-                    با صدا و چهرهٔ او ساخته شود.
+                    تأیید می‌کنم از این عکس و صدا فقط برای ساخت همین آهنگ هدیه استفاده می‌شود.
+                    صدا توسط هوش مصنوعی کلون شده و ترانه با همان صدا خوانده می‌شود.
+                    یا خودم صاحب این صدا هستم، یا صاحب صدا اجازه داده.
                   </span>
                 </label>
               </div>

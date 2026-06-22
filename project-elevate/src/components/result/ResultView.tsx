@@ -18,13 +18,13 @@ import {
 
 interface ResultViewProps {
   recipientName: string;
-  result: { videoUrl?: string; audioUrl?: string; lyrics?: string; coverArtUrl?: string };
+  result: { videoUrl?: string; audioUrl?: string; musicUrl?: string; lyrics?: string; coverArtUrl?: string };
   jobId?: string | null;
   onRestart: () => void;
 }
 
 export function ResultView({ recipientName, result, jobId, onRestart }: ResultViewProps) {
-  const { videoUrl, audioUrl, lyrics, coverArtUrl } = result;
+  const { videoUrl, audioUrl, musicUrl, lyrics, coverArtUrl } = result;
   const [keepsakeState, setKeepsakeState] = useState<"idle" | "loading" | "error">("idle");
   const [copied, setCopied] = useState(false);
 
@@ -146,7 +146,12 @@ export function ResultView({ recipientName, result, jobId, onRestart }: ResultVi
         )}
         {audioUrl && (
           <a href={audioUrl} download className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5">
-            <MusicNotes className="h-4 w-4" /> دانلود آهنگ
+            <MusicNotes className="h-4 w-4" /> دانلود صدای کلون
+          </a>
+        )}
+        {musicUrl && (
+          <a href={musicUrl} download className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5">
+            <MusicNotes className="h-4 w-4" /> دانلود موسیقی
           </a>
         )}
         {lyrics && jobId && (
