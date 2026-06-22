@@ -9,6 +9,7 @@ import { lipSyncVideo as lipSyncRunComfy } from "./providers/runcomfy";
 import { lipSyncVideo as lipSyncAurora } from "./providers/creatify";
 import { lipSyncVideo as lipSyncSynclabs } from "./providers/synclabs";
 import { lipSyncVideo as lipSyncHiggsfield } from "./providers/higgsfield";
+import { generateAvatarVideo } from "./providers/heygen";
 import {
   mixVoiceOverMusic,
   photoPlusAudioVideo,
@@ -32,6 +33,26 @@ function lipSyncVideo(imageUrl: string, audioUrl: string): Promise<Buffer> {
     case "higgsfield": return lipSyncHiggsfield(imageUrl, audioUrl);
     case "synclabs":   return lipSyncSynclabs(imageUrl, audioUrl);
     default:           return lipSyncRunComfy(imageUrl, audioUrl); // omnihuman / kling
+  }
+}
+
+/**
+ * When VIDEO_PROVIDER=heygen, generate an avatar video directly from the
+ * lyrics text rather than doing lipsync from a photo. The avatar speaks
+ * the lyrics over HeyGen's Avatar V engine.
+ */
+async function runHeyGenVideoStage(job: Job, lyrics: string): Promise<string | undefined> {
+  setStage(job.id, "video", "running");
+  try {
+    const raw = await generateAvatarVideo(lyrics);
+    const buf = await stripVideoMetadata(raw);
+    const videoUrl = (await savePublic(`${job.id}-video.mp4`, buf)).url;
+    setStage(job.id, "video", "done");
+    return videoUrl;
+  } catch (e) {
+    console.warn(`[pipeline] HeyGen avatar failed (${(e as Error)?.message})`);
+    setStage(job.id, "video", "done");
+    return undefined;
   }
 }
 
@@ -236,7 +257,10 @@ export async function runPipeline(job: Job) {
     result = { ...result, audioUrl };
     updateJob(job.id, { result });
 
-    const videoUrl = await runVideoStage(job, audioUrl);
+    const videoUrl =
+      videoProvider() === "heygen"
+        ? await runHeyGenVideoStage(job, lyrics)
+        : await runVideoStage(job, audioUrl);
     result = { ...result, videoUrl };
     updateJob(job.id, { result });
 
