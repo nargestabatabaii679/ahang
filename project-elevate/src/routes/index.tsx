@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { Waveform } from "@/components/Waveform";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -73,14 +74,18 @@ const features = [
 const EQ_HEIGHTS = [1, 0.55, 0.85, 0.35, 1, 0.65, 0.45, 0.9, 0.3, 0.7, 0.55, 1, 0.6, 0.85];
 
 function FloatingParticles() {
-  const particles = Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: 2 + Math.random() * 4,
-    delay: Math.random() * 4,
-    duration: 4 + Math.random() * 6,
-  }));
+  const [particles, setParticles] = useState<{ id: number; x: number; y: number; size: number; delay: number; duration: number }[]>([]);
+  useEffect(() => {
+    setParticles(Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 2 + Math.random() * 4,
+      delay: Math.random() * 4,
+      duration: 4 + Math.random() * 6,
+    })));
+  }, []);
+  if (!particles.length) return null;
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {particles.map((p) => (
