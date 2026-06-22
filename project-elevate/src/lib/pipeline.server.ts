@@ -27,6 +27,7 @@ import { generateMusic } from "./providers/suno";
 import { generateMusicWithArt } from "./providers/riffusion";
 import { lipSyncVideo as lipSyncAurora } from "./providers/creatify";
 import { generateAvatarVideo } from "./providers/heygen";
+import { generateCoverArt, animateImage } from "./providers/stability";
 import { sleep } from "./server-utils";
 
 const isMock = () => process.env.PIPELINE_MOCK === "true";
@@ -63,8 +64,19 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
         // Download from Suno CDN and re-upload to our Supabase bucket
         const buf = await fetchBytes(remoteUrl);
         result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
-        // Use the uploaded photo as cover art when Suno doesn't provide one
-        result.coverArtUrl = job.brief.photoUrl;
+        // Generate cover art with Stability AI if key is set; else fall back to uploaded photo
+        if (process.env.STABILITY_API_KEY) {
+          try {
+            const coverPrompt = `Album cover art, Persian music, ${job.brief.genre} mood, cinematic, no text, no words`;
+            const img = await generateCoverArt(coverPrompt);
+            result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
+          } catch (e) {
+            console.warn("[pipeline] Stability cover art failed:", (e as Error).message);
+            result.coverArtUrl = job.brief.photoUrl;
+          }
+        } else {
+          result.coverArtUrl = job.brief.photoUrl;
+        }
       } else {
         const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
         result.musicUrl = remoteUrl;
@@ -141,6 +153,14 @@ async function runVideoStage(
       } else if (photoUrl && audioUrl && videoProvider() === "aurora") {
         const buf = await lipSyncAurora(photoUrl, audioUrl);
         videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
+      } else if (videoProvider() === "stability" && process.env.STABILITY_API_KEY) {
+        // Animate the cover art (or uploaded photo) with Stable Video Diffusion
+        const sourceUrl = photoUrl;
+        if (sourceUrl) {
+          const imgBytes = await fetchBytes(sourceUrl);
+          const buf = await animateImage(imgBytes);
+          videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
+        }
       }
     } catch (e) {
       console.warn(
