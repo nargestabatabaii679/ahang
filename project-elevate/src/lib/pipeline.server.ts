@@ -16,7 +16,7 @@
 import { Job } from "./types";
 import { setStage, setJobStatus, updateJob, getJob } from "./jobs-store.server";
 import { savePublic, fetchBytes } from "./storage.server";
-import { draftLyrics, buildMusicPrompt } from "./providers/lyrics";
+import { draftLyrics, buildMusicPrompt, buildCoverArtPrompt } from "./providers/lyrics";
 import {
   cloneVoice,
   synthesize,
@@ -67,8 +67,7 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
         // Generate cover art with Stability AI if key is set; else fall back to uploaded photo
         if (process.env.STABILITY_API_KEY) {
           try {
-            const coverPrompt = `Album cover art, Persian music, ${job.brief.genre} mood, cinematic, no text, no words`;
-            const img = await generateCoverArt(coverPrompt);
+            const img = await generateCoverArt(buildCoverArtPrompt(job.brief));
             result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
           } catch (e) {
             console.warn("[pipeline] Stability cover art failed:", (e as Error).message);

@@ -1,6 +1,6 @@
 /**
  * Stability AI provider
- *  - generateCoverArt : text-to-image via Stable Diffusion 3.5
+ *  - generateCoverArt : text-to-image via Stable Diffusion 3.5 Large
  *  - animateImage     : image-to-video via Stable Video Diffusion (SVD)
  */
 
@@ -19,29 +19,37 @@ function authHeader() {
 export async function generateCoverArt(prompt: string): Promise<Uint8Array> {
   const form = new FormData();
   form.append("prompt", prompt);
+  form.append("negative_prompt",
+    "text, watermark, signature, letters, numbers, words, logo, blurry, low quality, ugly, distorted, cropped, bad anatomy, worst quality, jpeg artifacts"
+  );
   form.append("output_format", "jpeg");
   form.append("aspect_ratio", "1:1");
+  form.append("cfg_scale", "7");
 
-  const res = await fetch(`${BASE}/v2beta/stable-image/generate/sd3`, {
-    method: "POST",
-    headers: { ...authHeader(), Accept: "image/*" },
-    body: form,
-  });
+  // Try SD3.5 Large first, fall back to SD3 Medium
+  for (const model of ["sd3.5-large", "sd3-medium"]) {
+    const formCopy = new FormData();
+    form.forEach((v, k) => formCopy.append(k, v));
+    formCopy.append("model", model);
 
-  if (!res.ok) {
+    const res = await fetch(`${BASE}/v2beta/stable-image/generate/sd3`, {
+      method: "POST",
+      headers: { ...authHeader(), Accept: "image/*" },
+      body: formCopy,
+    });
+
+    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+
     const err = await res.text();
-    throw new Error(`Stability image failed ${res.status}: ${err}`);
+    if (res.status === 402 || res.status === 403) throw new Error(`Stability credits: ${err}`);
+    // 4xx on this model → try next
+    console.warn(`[stability] ${model} failed ${res.status}, trying next model`);
   }
 
-  return new Uint8Array(await res.arrayBuffer());
+  throw new Error("Stability AI: all cover art models failed");
 }
 
 // ── Image-to-Video (SVD) ───────────────────────────────────────────────────
-
-type SvidStartResponse = { id: string };
-type SvidResultResponse =
-  | { id: string; status: "in-progress" | "not-found" }
-  | { id: string; status: "complete"; video: string }; // video = base64
 
 export async function animateImage(imageBytes: Uint8Array): Promise<Uint8Array> {
   const form = new FormData();
@@ -50,9 +58,11 @@ export async function animateImage(imageBytes: Uint8Array): Promise<Uint8Array> 
     new Blob([imageBytes], { type: "image/jpeg" }),
     "cover.jpg"
   );
-  form.append("seed", "0");
-  form.append("cfg_scale", "1.8");
-  form.append("motion_bucket_id", "127");
+  // Higher cfg_scale = more faithful to image; motion_bucket_id 40-127
+  // 60 gives smooth cinematic motion without too much warping
+  form.append("cfg_scale", "2.5");
+  form.append("motion_bucket_id", "60");
+  form.append("seed", "42");
 
   const startRes = await fetch(`${BASE}/v2beta/image-to-video`, {
     method: "POST",
@@ -65,9 +75,8 @@ export async function animateImage(imageBytes: Uint8Array): Promise<Uint8Array> 
     throw new Error(`Stability SVD start failed ${startRes.status}: ${err}`);
   }
 
-  const { id } = (await startRes.json()) as SvidStartResponse;
+  const { id } = (await startRes.json()) as { id: string };
 
-  // Poll until complete
   const b64 = await pollUntil<string>(
     async () => {
       const res = await fetch(`${BASE}/v2beta/image-to-video/result/${id}`, {
@@ -77,9 +86,7 @@ export async function animateImage(imageBytes: Uint8Array): Promise<Uint8Array> 
       if (res.status === 202) return { status: "pending" };
       if (!res.ok) return { status: "failed", reason: `status ${res.status}` };
 
-      // API returns video bytes directly with Accept: video/*
       const buf = await res.arrayBuffer();
-      // encode to base64 to pass through pollUntil
       const bytes = new Uint8Array(buf);
       let binary = "";
       bytes.forEach((b) => (binary += String.fromCharCode(b)));
@@ -88,7 +95,6 @@ export async function animateImage(imageBytes: Uint8Array): Promise<Uint8Array> 
     { label: "StabilityAI SVD", intervalMs: 8000, timeoutMs: 300_000 }
   );
 
-  // decode base64 → Uint8Array
   const binary = atob(b64);
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);

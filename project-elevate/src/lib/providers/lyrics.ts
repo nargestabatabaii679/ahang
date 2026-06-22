@@ -212,27 +212,148 @@ export async function draftLyrics(brief: SongBrief): Promise<string> {
   return localDraft(brief);
 }
 
-const genreTags: Record<Genre, string> = {
-  romantic:
-    "warm romantic ballad, soft piano, gentle strings, slow tempo, intimate, tender, no upbeat drums, no EDM",
-  emotional:
-    "intimate piano ballad, close-miked, sparse arrangement, minimal reverb, tender strings, vulnerable, no cinematic swell, no epic drums, no pop hooks",
-  happy:
-    "upbeat persian pop, bright synth pads, claps, major key, joyful, radio-ready modern production",
-  calm:
-    "calm acoustic, soft fingerpicked guitar, gentle, peaceful, natural room tone, no synthesizers, no heavy drums",
-  motivational:
-    "uplifting cinematic, building energy, triumphant strings and brass, driving rhythm, inspiring, hopeful, no lofi, no sad minor key",
-  nostalgic:
-    "nostalgic warm, dusty vinyl crackle, mellow rhodes piano, tape saturation, wistful, retro warmth, no bright pop hooks",
+// ── Music prompts ─────────────────────────────────────────────────────────
+
+interface GenreMusic {
+  tags: string;
+  bpm: string;
+  key: string;
+  instruments: string;
+  production: string;
+}
+
+const genreMusic: Record<Genre, GenreMusic> = {
+  romantic: {
+    tags: "romantic ballad, cinematic, lush",
+    bpm: "60-72 BPM",
+    key: "D major or A major",
+    instruments: "grand piano, cello, violin section, soft acoustic guitar, subtle strings pad, gentle bass",
+    production: "warm mastering, intimate close-mic room reverb, gentle tape saturation, lush stereo width on strings",
+  },
+  emotional: {
+    tags: "emotional ballad, intimate, raw",
+    bpm: "50-65 BPM",
+    key: "C minor or E minor",
+    instruments: "upright piano, solo cello, sparse pizzicato strings, subtle ambient pad, soft kick on 2 and 4",
+    production: "close-miked dry piano, minimal reverb, subtle tape compression, space and silence between phrases",
+  },
+  happy: {
+    tags: "upbeat persian pop, joyful, radio-ready",
+    bpm: "108-120 BPM",
+    key: "G major or C major",
+    instruments: "bright synth pads, electric guitar stabs, hand claps, shaker, funk bass, punchy kick, crispy snare",
+    production: "modern pop mastering, sidechain compression, bright high-end air, wide stereo mix, punchy low end",
+  },
+  calm: {
+    tags: "calm acoustic, peaceful, organic",
+    bpm: "72-84 BPM",
+    key: "A major or E major",
+    instruments: "fingerpicked acoustic guitar, soft nylon string guitar, light cajón, subtle kalimba, warm bass",
+    production: "natural room tone, minimal processing, gentle compression, soft high shelf, no synthesizers",
+  },
+  motivational: {
+    tags: "uplifting cinematic, triumphant, epic",
+    bpm: "90-110 BPM",
+    key: "E major or B major",
+    instruments: "brass section, string orchestra, epic taiko drums, driving 8th-note piano, french horn, bass drum",
+    production: "cinematic mastering, wide room reverb on strings, stadium-sized reverb on drums, building energy",
+  },
+  nostalgic: {
+    tags: "nostalgic, vintage warmth, retro",
+    bpm: "76-88 BPM",
+    key: "F major or G major",
+    instruments: "rhodes piano, nylon guitar, soft vibraphone, brushed snare, upright bass, subtle mellotron strings",
+    production: "vinyl crackle layer, tape saturation, low-pass filter warmth, slight wow-and-flutter, lo-fi mastering",
+  },
 };
 
 export function buildMusicPrompt(brief: SongBrief): {
   tags: string;
   description: string;
 } {
+  const m = genreMusic[brief.genre];
+  const name = brief.recipientName.trim() || "عزیزم";
+  const occasion = occasionLabel[brief.occasion];
+
   return {
-    tags: `instrumental, no vocals, ${genreTags[brief.genre]}`,
-    description: `Instrumental ${genreLabel[brief.genre]} backing track for a personal Persian gift song. Emotional and warm, leaves room for a lead vocal on top. No lead vocals.`,
+    tags: [
+      "instrumental",
+      "no vocals",
+      "no singing",
+      "no lyrics",
+      m.tags,
+      m.bpm,
+      m.key,
+    ].join(", "),
+    description:
+      `A professional studio-quality instrumental backing track for a personal Persian gift song dedicated to "${name}" for ${occasion}. ` +
+      `Mood: ${genreLabel[brief.genre]}. ` +
+      `Instruments: ${m.instruments}. ` +
+      `Production style: ${m.production}. ` +
+      `Leaves generous space and headroom for a lead vocal to sit on top. No lead vocals, no lyrics, purely instrumental.`,
   };
+}
+
+// ── Cover art prompts ──────────────────────────────────────────────────────
+
+interface GenreArt {
+  style: string;
+  palette: string;
+  mood: string;
+  elements: string;
+}
+
+const genreArt: Record<Genre, GenreArt> = {
+  romantic: {
+    style: "painterly digital art, soft impressionism, dreamy",
+    palette: "deep rose, gold, champagne, warm burgundy, candlelight",
+    mood: "intimate, tender, magical evening",
+    elements: "rose petals, soft bokeh lights, flowing silk, warm candlelight glow",
+  },
+  emotional: {
+    style: "fine art photography aesthetic, moody chiaroscuro",
+    palette: "deep teal, cobalt, silver moonlight, shadow blue",
+    mood: "raw, heartfelt, introspective",
+    elements: "rain on glass, solitary light, misty atmosphere, delicate flowers",
+  },
+  happy: {
+    style: "vibrant contemporary digital illustration, pop art energy",
+    palette: "sunflower yellow, coral, turquoise, bright white, electric blue",
+    mood: "joyful, celebratory, energetic",
+    elements: "confetti, sunbursts, colorful ribbons, sparkles, blooming flowers",
+  },
+  calm: {
+    style: "minimalist watercolor, zen art, serene",
+    palette: "sage green, soft ivory, pale lavender, warm sand, sky blue",
+    mood: "peaceful, meditative, gentle",
+    elements: "lotus flower, still water reflection, morning mist, single branch in bloom",
+  },
+  motivational: {
+    style: "epic cinematic concept art, grand scale",
+    palette: "golden sunrise, royal blue, white light, deep orange, silver",
+    mood: "triumphant, inspiring, powerful",
+    elements: "mountain peak, rays of light breaking through clouds, eagle soaring, horizon",
+  },
+  nostalgic: {
+    style: "vintage film photography, retro illustration, analog warmth",
+    palette: "sepia, faded amber, dusty rose, cream, warm brown",
+    mood: "wistful, tender memories, timeless",
+    elements: "old photographs, dried flowers, vintage clock, soft grain texture, film light leak",
+  },
+};
+
+export function buildCoverArtPrompt(brief: SongBrief): string {
+  const art = genreArt[brief.genre];
+  const name = brief.recipientName.trim() || "عزیزم";
+  const occasion = occasionLabel[brief.occasion];
+
+  return [
+    `Premium album cover art for a personal Persian gift song for "${name}", occasion: ${occasion}.`,
+    `Art style: ${art.style}.`,
+    `Color palette: ${art.palette}.`,
+    `Mood and atmosphere: ${art.mood}.`,
+    `Visual elements: ${art.elements}.`,
+    `Square format, centered composition, no text, no words, no letters, no numbers.`,
+    `Ultra high quality, professional music album cover, sharp details, stunning visuals.`,
+  ].join(" ");
 }

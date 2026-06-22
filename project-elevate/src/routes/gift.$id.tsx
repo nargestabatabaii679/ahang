@@ -3,6 +3,7 @@ import { ArrowRight, MusicNotes, Play, Heart, WhatsappLogo, TelegramLogo, LinkSi
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { getGiftJob } from "@/lib/gift.functions";
+import { LyricVideo } from "@/components/LyricVideo";
 
 export const Route = createFileRoute("/gift/$id")({
   loader: async ({ params }) => {
@@ -116,6 +117,24 @@ function GiftPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Lyric Video generator */}
+        {audioUrl && coverArtUrl && lyrics && !videoUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.38 }}
+            className="sticker-card mt-8 rotate-1 p-4 sm:p-5"
+          >
+            <p className="font-counter mb-3 text-[10px] uppercase tracking-[0.2em] text-[var(--color-accent)]">side b · لیریک ویدیو</p>
+            <LyricVideo
+              coverArtUrl={coverArtUrl}
+              audioUrl={audioUrl}
+              lyrics={lyrics}
+              recipientName={recipientName}
+            />
+          </motion.div>
+        )}
 
         {/* Lyrics */}
         {lyrics && (
