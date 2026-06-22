@@ -2,3 +2,5 @@ node_modules/
 .next/
 .env.local
 *.pem
+public/generated/
+tsconfig.tsbuildinfo
