@@ -58,8 +58,16 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
         const { audio, coverArt } = await generateMusicWithArt(job.brief);
         result.musicUrl = (await savePublic(`${job.id}-music.mp3`, audio)).url;
         result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, coverArt)).url;
+      } else if (musicProvider() === "suno") {
+        const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
+        // Download from Suno CDN and re-upload to our Supabase bucket
+        const buf = await fetchBytes(remoteUrl);
+        result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
+        // Use the uploaded photo as cover art when Suno doesn't provide one
+        result.coverArtUrl = job.brief.photoUrl;
       } else {
-        result.musicUrl = await generateMusic(buildMusicPrompt(job.brief));
+        const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
+        result.musicUrl = remoteUrl;
       }
     } catch (e) {
       console.warn(

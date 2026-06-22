@@ -94,40 +94,122 @@ function localDraft(brief: SongBrief): string {
   ].join("\n");
 }
 
+/** OpenAI-compatible chat completions call (works for Anthropic via proxy, AvvalAI, OpenRouter) */
+async function chatCompletion(
+  base: string,
+  key: string,
+  model: string,
+  brief: SongBrief,
+  extraHeaders: Record<string, string> = {}
+): Promise<string> {
+  const res = await fetch(`${base}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      ...extraHeaders,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: buildPrompt(brief) },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`${base} ${res.status}: ${await res.text()}`);
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = json.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error("پاسخ خالی از AI");
+  return text;
+}
+
+/** Anthropic native API (Messages API) */
+async function anthropicLyrics(brief: SongBrief): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildPrompt(brief) }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+  const json = (await res.json()) as { content?: { type: string; text: string }[] };
+  const text = json.content?.find((c) => c.type === "text")?.text?.trim();
+  if (!text) throw new Error("Anthropic پاسخ خالی برگرداند");
+  return text;
+}
+
 /**
- * Draft Persian song lyrics via the Lovable AI Gateway (Gemini Flash).
- * Falls back to a simple local template if the gateway is unavailable.
+ * Draft Persian song lyrics.
+ * Priority: Anthropic → AvvalAI → OpenRouter → local template
  */
 export async function draftLyrics(brief: SongBrief): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) return localDraft(brief);
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildPrompt(brief) },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`Lovable AI ${res.status}: ${await res.text()}`);
-    const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = json.choices?.[0]?.message?.content?.trim();
-    if (!text) throw new Error("Lovable AI پاسخ خالی برگرداند");
-    return text;
-  } catch (e) {
-    console.warn("[lyrics] Lovable AI failed, using local draft:", (e as Error).message);
-    return localDraft(brief);
+  // 1. Anthropic Claude (best for Persian poetry)
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      return await anthropicLyrics(brief);
+    } catch (e) {
+      console.warn("[lyrics] Anthropic failed:", (e as Error).message);
+    }
   }
+
+  // 2. AvvalAI (OpenAI-compatible, works inside Iran)
+  if (process.env.AVALAI_API_KEY) {
+    try {
+      return await chatCompletion(
+        (process.env.AVALAI_API_BASE || "https://api.avalai.ir/v1").replace(/\/$/, ""),
+        process.env.AVALAI_API_KEY,
+        "gpt-4o-mini",
+        brief
+      );
+    } catch (e) {
+      console.warn("[lyrics] AvvalAI failed:", (e as Error).message);
+    }
+  }
+
+  // 3. OpenRouter (access to many models)
+  if (process.env.OPENROUTER_API_KEY) {
+    try {
+      return await chatCompletion(
+        "https://openrouter.ai/api/v1",
+        process.env.OPENROUTER_API_KEY,
+        "google/gemini-flash-1.5",
+        brief,
+        { "HTTP-Referer": "https://songai.app", "X-Title": "SongAI" }
+      );
+    } catch (e) {
+      console.warn("[lyrics] OpenRouter failed:", (e as Error).message);
+    }
+  }
+
+  // 4. Lovable AI Gateway (original)
+  if (process.env.LOVABLE_API_KEY) {
+    try {
+      return await chatCompletion(
+        "https://ai.gateway.lovable.dev/v1",
+        process.env.LOVABLE_API_KEY,
+        "google/gemini-3-flash-preview",
+        brief
+      );
+    } catch (e) {
+      console.warn("[lyrics] Lovable AI failed:", (e as Error).message);
+    }
+  }
+
+  // 5. Local fallback — always works
+  return localDraft(brief);
 }
 
 const genreTags: Record<Genre, string> = {
