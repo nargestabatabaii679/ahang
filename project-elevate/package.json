@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "NITRO_PRESET=node-server vite dev",
     "build": "NITRO_PRESET=node-server vite build",
+    "deploy": "npm run build && liara deploy --app songai --port 3000",
     "build:dev": "NITRO_PRESET=node-server vite build --mode development",
     "start": "NITRO_HOST=0.0.0.0 NITRO_PORT=3000 node .output/server/index.mjs",
     "preview": "vite preview",
