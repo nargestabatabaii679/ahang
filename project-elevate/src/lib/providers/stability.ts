@@ -1,9 +1,12 @@
 /**
  * Stability AI provider
- *  - generateCoverArt : text-to-image via Stable Diffusion 3.5 Large
- *  - animateImage     : image-to-video via Stable Video Diffusion (SVD)
+ *  - generateMusicStability: text-to-audio via Stable Audio 2.0
+ *  - generateCoverArt      : text-to-image via Stable Diffusion 3.5 Large
+ *  - animateImage          : image-to-video via Stable Video Diffusion (SVD)
  */
 
+import { SongBrief } from "../types";
+import { buildMusicPrompt } from "./lyrics";
 import { pollUntil } from "../server-utils";
 
 const BASE = "https://api.stability.ai";
@@ -12,6 +15,47 @@ const key = () => process.env.STABILITY_API_KEY || "";
 function authHeader() {
   if (!key()) throw new Error("STABILITY_API_KEY تنظیم نشده است");
   return { Authorization: `Bearer ${key()}` };
+}
+
+// ── Music (Stable Audio 2.0) ───────────────────────────────────────────────
+
+export async function generateMusicStability(
+  brief: SongBrief,
+  durationSeconds = 47
+): Promise<Uint8Array> {
+  if (!key()) throw new Error("STABILITY_API_KEY تنظیم نشده است");
+
+  const { tags, description } = buildMusicPrompt(brief);
+  const prompt = `${description} Style: ${tags}.`;
+  const dur = Math.max(1, Math.min(190, Math.round(durationSeconds)));
+
+  const form = new FormData();
+  form.append("prompt", prompt);
+  form.append("duration", String(dur));
+  form.append("output_format", "mp3");
+  form.append("seed", "0");
+  form.append("steps", "50");
+  form.append("cfg_scale", "7");
+
+  console.log(`[stability] requesting ${dur}s audio, prompt="${prompt.slice(0, 80)}..."`);
+  const res = await fetch(`${BASE}/v2beta/audio/stable-audio-2/text-to-audio`, {
+    method: "POST",
+    headers: { ...authHeader(), Accept: "audio/*" },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error(`[stability] audio ${res.status}:`, text.slice(0, 300));
+    throw new Error(`Stability Audio ${res.status}: ${text.slice(0, 300) || res.statusText}`);
+  }
+
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  console.log(`[stability] generated ${bytes.byteLength} bytes`);
+  if (bytes.byteLength < 10_000) {
+    throw new Error(`Stability Audio returned too small payload (${bytes.byteLength} bytes)`);
+  }
+  return bytes;
 }
 
 // ── Cover Art ──────────────────────────────────────────────────────────────

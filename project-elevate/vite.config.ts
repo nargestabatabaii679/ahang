@@ -12,4 +12,11 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Pin nitro to node-server preset for Node.js/Docker/Liara deployment.
+  // better-sqlite3 and local filesystem are not compatible with Cloudflare Workers.
+  nitro: {
+    preset: "node-server",
+    // Ensure the server listens on all interfaces in production (required by Liara/Docker)
+    devServer: { host: "0.0.0.0" },
+  },
 });

@@ -28,16 +28,17 @@ import { generateMusic } from "./providers/suno";
 import { generateMusicWithArt } from "./providers/riffusion";
 import { lipSyncVideo as lipSyncAurora } from "./providers/creatify";
 import { generateAvatarVideo } from "./providers/heygen";
-import { generateCoverArt, animateImage } from "./providers/stability";
+import { generateCoverArt, animateImage, generateMusicStability } from "./providers/stability";
 import { sleep } from "./server-utils";
 
 const isMock = () => process.env.PIPELINE_MOCK === "true";
-const musicProvider = () => process.env.MUSIC_PROVIDER || "riffusion";
+const musicProvider = () => process.env.MUSIC_PROVIDER || "auto";
 const videoProvider = () => process.env.VIDEO_PROVIDER || "aurora";
 
 interface MusicStageResult {
   musicUrl?: string;
   coverArtUrl?: string;
+  musicError?: string;
 }
 
 async function runLyricsStage(job: Job): Promise<string> {
@@ -48,6 +49,20 @@ async function runLyricsStage(job: Job): Promise<string> {
   return lyrics;
 }
 
+async function pickMusicProvider(): Promise<"stability" | "suno" | "riffusion" | "elevenlabs" | "none"> {
+  const explicit = musicProvider();
+  if (explicit === "stability") return "stability";
+  if (explicit === "suno") return "suno";
+  if (explicit === "riffusion") return "riffusion";
+  if (explicit === "elevenlabs") return "elevenlabs";
+  // auto: prefer Stability Audio → Suno → Riffusion → ElevenLabs
+  if (process.env.STABILITY_API_KEY) return "stability";
+  if (process.env.SUNO_API_BASE) return "suno";
+  if (process.env.RIFFUSION_API_BASE) return "riffusion";
+  if (process.env.ELEVENLABS_API_KEY) return "elevenlabs";
+  return "none";
+}
+
 async function runMusicStage(job: Job): Promise<MusicStageResult> {
   await setStage(job.id, "music", "running");
   let result: MusicStageResult = {};
@@ -55,47 +70,52 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
   if (isMock()) {
     await sleep(900);
   } else {
+    const provider = await pickMusicProvider();
+    console.log(`[pipeline] music provider = ${provider}`);
+
+    const tryStabilityCoverArt = async () => {
+      if (process.env.STABILITY_API_KEY && !result.coverArtUrl) {
+        try {
+          const img = await generateCoverArt(buildCoverArtPrompt(job.brief));
+          result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
+        } catch (e) {
+          console.warn("[pipeline] Stability cover art failed:", (e as Error).message);
+        }
+      }
+    };
+
     try {
-      if (musicProvider() === "riffusion") {
+      if (provider === "stability") {
+        const audio = await generateMusicStability(job.brief, 47);
+        result.musicUrl = (await savePublic(`${job.id}-music.mp3`, audio, "audio/mpeg")).url;
+        await tryStabilityCoverArt();
+      } else if (provider === "suno") {
+        const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
+        const buf = await fetchBytes(remoteUrl);
+        result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
+        await tryStabilityCoverArt();
+      } else if (provider === "riffusion") {
         const { audio, coverArt } = await generateMusicWithArt(job.brief);
         result.musicUrl = (await savePublic(`${job.id}-music.mp3`, audio)).url;
         result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, coverArt)).url;
-      } else if (musicProvider() === "suno") {
-        const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
-        // Download from Suno CDN and re-upload to our Supabase bucket
-        const buf = await fetchBytes(remoteUrl);
+      } else if (provider === "elevenlabs") {
+        const buf = await generateMusicEL(buildELMusicPrompt(job.brief));
         result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
-        // Generate cover art with Stability AI if key is set; else fall back to uploaded photo
-        if (process.env.STABILITY_API_KEY) {
-          try {
-            const img = await generateCoverArt(buildCoverArtPrompt(job.brief));
-            result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
-          } catch (e) {
-            console.warn("[pipeline] Stability cover art failed:", (e as Error).message);
-            result.coverArtUrl = job.brief.photoUrl;
-          }
-        } else {
-          result.coverArtUrl = job.brief.photoUrl;
-        }
+        await tryStabilityCoverArt();
       } else {
-        const remoteUrl = await generateMusic(buildMusicPrompt(job.brief));
-        result.musicUrl = remoteUrl;
+        console.warn("[pipeline] no music provider configured; skipping instrumental");
       }
     } catch (e) {
-      console.warn(`[pipeline] music provider failed (${(e as Error)?.message}); trying ElevenLabs Sound Generation...`);
-      if (process.env.ELEVENLABS_API_KEY) {
+      const msg = (e as Error)?.message || "خطای ناشناخته";
+      console.warn(`[pipeline] music provider (${provider}) failed: ${msg}; trying ElevenLabs fallback...`);
+      // Fallback to ElevenLabs Sound Generation if not already tried
+      if (provider !== "elevenlabs" && process.env.ELEVENLABS_API_KEY) {
         try {
           const buf = await generateMusicEL(buildELMusicPrompt(job.brief));
           result.musicUrl = (await savePublic(`${job.id}-music.mp3`, buf, "audio/mpeg")).url;
-          // Try Stability cover art after EL music
-          if (process.env.STABILITY_API_KEY && !result.coverArtUrl) {
-            try {
-              const img = await generateCoverArt(buildCoverArtPrompt(job.brief));
-              result.coverArtUrl = (await savePublic(`${job.id}-cover.jpg`, img, "image/jpeg")).url;
-            } catch { /* non-fatal */ }
-          }
+          await tryStabilityCoverArt();
         } catch (e2) {
-          console.warn(`[pipeline] ElevenLabs music failed: ${(e2 as Error).message}`);
+          console.warn(`[pipeline] ElevenLabs music fallback failed: ${(e2 as Error).message}`);
         }
       }
     }
@@ -202,6 +222,7 @@ export async function runPipeline(jobId: string) {
     result = {
       ...result,
       musicUrl: music.musicUrl,
+      musicError: music.musicError,
       coverArtUrl: music.coverArtUrl,
     };
     await updateJob(job.id, { result });
