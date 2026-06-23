@@ -62,7 +62,9 @@ function openaiKey() {
 /**
  * Generate a real Persian song lyric via OpenAI.
  * Always attempts the API call; throws on failure so the pipeline can report it.
- * Only falls back to localDraft when OPENAI_API_KEY is literally absent from env.
+ * Falls back to localDraft when the key is absent OR when the API call fails
+ * (network error, invalid key, rate limit) — same graceful-degradation pattern
+ * as the music/voice/video stages so the whole job never dies on one provider.
  */
 export async function draftLyrics(brief: SongBrief): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
@@ -70,36 +72,41 @@ export async function draftLyrics(brief: SongBrief): Promise<string> {
     return localDraft(brief);
   }
 
-  const res = await fetch(`${openaiBase()}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openaiKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_LYRICS_MODEL || "gpt-4o-mini",
-      temperature: 0.9,
-      max_tokens: 600,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildPrompt(brief) },
-      ],
-    }),
-  });
+  try {
+    const res = await fetch(`${openaiBase()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openaiKey()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_LYRICS_MODEL || "gpt-4o-mini",
+        temperature: 0.9,
+        max_tokens: 600,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: buildPrompt(brief) },
+        ],
+      }),
+    });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `OpenAI lyrics API خطا داد (${res.status}): ${body.slice(0, 300)}`
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`OpenAI (${res.status}): ${body.slice(0, 200)}`);
+    }
+
+    const json = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = json.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("OpenAI پاسخ خالی برگرداند");
+    return text;
+  } catch (e) {
+    console.warn(
+      `[lyrics] OpenAI failed (${(e as Error)?.message}); falling back to local draft`
     );
+    return localDraft(brief);
   }
-
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const text = json.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("OpenAI پاسخ خالی برگرداند");
-  return text;
 }
 
 const SYSTEM_PROMPT = `تو یک ترانه‌سرای حرفه‌ای فارسی هستی. ترانه‌هایی می‌نویسی که:
@@ -140,18 +147,117 @@ function buildPrompt(brief: SongBrief): string {
   return lines.join("\n");
 }
 
-/** Offline fallback — only used when OPENAI_API_KEY is absent. */
+/** Rich offline fallback — genre-aware Persian lyrics template. */
 function localDraft(brief: SongBrief): string {
   const name = brief.recipientName.trim() || "عزیزم";
   const about = brief.aboutText?.trim();
-  return [
-    `${name} جان،`,
-    `به مناسبت ${occasionLabel[brief.occasion]} برایت می‌نویسم.`,
-    "",
-    about || "هر لحظه‌ای که با تو می‌گذرد، یک ترانه است.",
-    "",
-    "این آهنگ را ساختم تا بدانی چقدر برایم عزیزی.",
-  ].join("\n");
+
+  const verses: Record<Genre, string[]> = {
+    happy: [
+      `${name} جان، امروز روز توست`,
+      `شادی‌ات مثل آفتاب گرم و دوست`,
+      `هر خنده‌ات دنیامو پر از نور می‌کنه`,
+      `این آهنگ رو ساختم تا یادت بمونه`,
+      "",
+      `برای تو می‌خونم، برای تو می‌سازم`,
+      `این لحظه رو با تو جشن می‌گیرم`,
+      "",
+      `${name}، تولدت مبارک باد`,
+      `هر آرزوت برآورده بشه، هر راهت آباد`,
+      `خوشحالی‌ات آرزوی منه هر روز`,
+      `این ترانه‌ام رو بشنو و شاد بشو`,
+      "",
+      `برای تو می‌خونم، برای تو می‌سازم`,
+      `این لحظه رو با تو جشن می‌گیرم`,
+    ],
+    romantic: [
+      `${name} عزیزم، چشمامو که می‌بندم`,
+      `فقط صدای نفست رو می‌شنوم`,
+      `بودنت کنارم معنای همه چیزه`,
+      `این ترانه رو از ته قلبم برات می‌سازم`,
+      "",
+      `دوستت دارم، بیشتر از هر کلمه‌ای`,
+      `هر روز بیشتر از دیروز`,
+      "",
+      `نگاهت که بهم میفته دلم می‌لرزه`,
+      `صدات که می‌شنوم، دنیا قشنگ‌تر میشه`,
+      about ? `${about}` : `کنارت بودن، بهترین لحظه‌های زندگیمه`,
+      `این آهنگ صدای دلمه، فقط برای توئه`,
+      "",
+      `دوستت دارم، بیشتر از هر کلمه‌ای`,
+      `هر روز بیشتر از دیروز`,
+    ],
+    emotional: [
+      `${name}، می‌دونم که راه سختی بودی`,
+      `ولی هیچ‌وقت تنها نبودی`,
+      `هر قدمی که برداشتی، کنارت بودم`,
+      `این ترانه رو برای لحظه‌های قشنگمون ساختم`,
+      "",
+      `ممنونم که هستی، ممنونم که موندی`,
+      `دنیام با وجود تو معنا داره`,
+      "",
+      about ? `"${about}" — این جمله‌ات تو قلبمه` : `یادم میاد اون روزایی که با هم خندیدیم`,
+      `و اون لحظه‌هایی که دست هم رو گرفتیم`,
+      `ممنونم ${name}، برای همه چیز`,
+      `این ترانه کمتر از قدردانیمه`,
+      "",
+      `ممنونم که هستی، ممنونم که موندی`,
+      `دنیام با وجود تو معنا داره`,
+    ],
+    calm: [
+      `${name}، وقتی کنارتم آروم می‌گیرم`,
+      `مثل یه باد ملایم تابستون`,
+      `سکوتت هم حرف داره، نگاهت گرمه`,
+      `این ترانه رو آروم برات زمزمه می‌کنم`,
+      "",
+      `آروم بمون، کنارتم همیشه`,
+      `تا وقتی که باشی، همه چیز خوبه`,
+      "",
+      about ? `${about} — این قلب منه` : `دستاتو بده، چشماتو ببند`,
+      `بذار لحظه رو با هم زندگی کنیم`,
+      `نه دیروز، نه فردا، همین الان`,
+      `${name} جان، شادم که هستی`,
+      "",
+      `آروم بمون، کنارتم همیشه`,
+      `تا وقتی که باشی، همه چیز خوبه`,
+    ],
+    motivational: [
+      `${name}، بلند شو، دنیا منتظرته`,
+      `تو قدرت داری که کوه رو جا بکنی`,
+      `هر سختی که دیدی قوی‌ترت کرد`,
+      `این ترانه رو برای تو، برای آینده‌ات ساختم`,
+      "",
+      `برو جلو، نترس، بال داری`,
+      `آسمون برای تو باز میشه`,
+      "",
+      about ? `"${about}" — این قدرت منحصر توئه` : `تو از جنس کسایی هستی که تسلیم نمیشن`,
+      `هر بار که افتادی، بلند شدی`,
+      `${name}، به خودت ایمان داشته باش`,
+      `بهترین هنوز نیومده`,
+      "",
+      `برو جلو، نترس، بال داری`,
+      `آسمون برای تو باز میشه`,
+    ],
+    nostalgic: [
+      `${name}، یادته اون روزا؟`,
+      `وقتی که همه چیز ساده‌تر بود`,
+      `صدای خنده‌هامون هنوز تو گوشمه`,
+      `این ترانه رو برای اون لحظه‌های ناب ساختم`,
+      "",
+      `دلم تنگه، دلم تنگ اون روزا`,
+      `تنگ صدات، تنگ نگاهت`,
+      "",
+      about ? `${about} — چقدر دلم می‌خواد برگردیم` : `یادم میاد اون بوی باروون پاییزی`,
+      `و اون چایی که با هم خوردیم`,
+      `${name}، گذشت، ولی فراموش نمیشه`,
+      `تو قلبمی، همیشه`,
+      "",
+      `دلم تنگه، دلم تنگ اون روزا`,
+      `تنگ صدات، تنگ نگاهت`,
+    ],
+  };
+
+  return verses[brief.genre].join("\n");
 }
 
 /**
