@@ -1,76 +1,72 @@
-# راه‌اندازی project-elevate
+# راه‌اندازی و Deploy
 
-## ۱. متغیرهای محیطی الزامی
+## پیش‌نیازها
+- Node.js 22+
+- npm 10+
 
-فایل `.env` را باز کن و این مقادیر را پر کن:
-
-### Supabase (ضروری — بدونش بک‌اند کار نمی‌کند)
-```
-SUPABASE_URL=https://<your-id>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<from Supabase → Settings → API → service_role>
-```
-> ⚠️ `SUPABASE_SERVICE_ROLE_KEY` را از داشبورد Supabase → Settings → API بگیر.
-
-### پس از راه‌اندازی Supabase، migration ها را اجرا کن:
-```bash
-npx supabase db push
-# یا مستقیم در SQL editor داشبورد Supabase بزن
-```
-
----
-
-## ۲. API های اختیاری (هر کدام که داری)
-
-| سرویس | متغیر | کجا بگیری |
-|--------|--------|-----------|
-| **HeyGen** (ویدیوی آواتار) | `HEYGEN_API_KEY` + `HEYGEN_AVATAR_ID` + `HEYGEN_VOICE_ID` | app.heygen.com → Settings → API |
-| **ElevenLabs** (کلون صدا) | `ELEVENLABS_API_KEY` | elevenlabs.io → Profile |
-| **Creatify Aurora** (lipsync از عکس) | `CREATIFY_API_ID` + `CREATIFY_API_KEY` | creatify.ai |
-| **Riffusion** (موسیقی) | `RIFFUSION_API_BASE=http://localhost:3013` | self-hosted |
-
----
-
-## ۳. انتخاب provider ویدیو
-
-در `.env` یکی از این‌ها را فعال کن:
-```bash
-VIDEO_PROVIDER=heygen   # آواتار HeyGen — نیاز به HEYGEN_* keys
-VIDEO_PROVIDER=aurora   # lipsync از عکس — نیاز به CREATIFY_* keys
-```
-
----
-
-## ۴. بدون هیچ key — حالت mock
-
-برای تست بدون هیچ API:
-```bash
-PIPELINE_MOCK=true
-```
-ترانه تولید می‌شود (از قالب محلی) ولی موسیقی و ویدیو placeholder خواهد بود.
-
----
-
-## ۵. اجرای محلی
+## اجرای محلی (Development)
 
 ```bash
-cd project-elevate
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
----
+سرور روی `http://localhost:3000` اجرا می‌شود.
 
-## مسیر کامل با API key های واقعی
+## Build برای Production (Node.js)
 
+```bash
+npm install
+npm run build   # NITRO_PRESET=node-server به‌صورت خودکار اعمال می‌شود
+npm run start   # راه‌اندازی سرور Node.js روی پورت 3000
 ```
-کاربر فرم را پر می‌کند
-  → POST /api/jobs (عکس + صدا آپلود، job ساخته می‌شود)
-  → pipeline شروع می‌شود:
-      ① lyrics   — ترانه فارسی (Lovable AI / قالب محلی)
-      ② music    — موسیقی (Riffusion / Suno)
-      ③ voice    — کلون صدا + TTS (ElevenLabs)
-      ④ video    — ویدیوی آواتار (HeyGen) یا lipsync (Creatify)
-      ⑤ finalize — ذخیره نهایی
-  → کاربر نتیجه را دانلود / اشتراک می‌گذارد
-  → لینک /gift/:id برای گیرنده
+
+## Deploy در Liara
+
+```bash
+# نصب Liara CLI
+npm install -g @liara/cli
+
+# لاگین
+liara login
+
+# ایجاد اپ (یکبار)
+liara app create --name songai --platform docker
+
+# ایجاد Disk برای فایل‌های دائمی (یکبار)
+liara disk create --app songai --name songai-data --size 1
+liara disk create --app songai --name songai-media --size 5
+
+# تنظیم متغیرهای محیطی
+liara env set --app songai \
+  ANTHROPIC_API_KEY=sk-ant-... \
+  ELEVENLABS_API_KEY=sk_... \
+  STABILITY_API_KEY=sk-sb... \
+  OPENROUTER_API_KEY=sk-or-v1-... \
+  NODE_ENV=production
+
+# Deploy
+liara deploy --app songai --port 3000
 ```
+
+## متغیرهای محیطی
+
+| متغیر | توضیح |
+|-------|-------|
+| ANTHROPIC_API_KEY | کلید Anthropic Claude (اولویت اول برای ترانه) |
+| ELEVENLABS_API_KEY | کلید ElevenLabs برای کلون صدا + موزیک |
+| STABILITY_API_KEY | کلید Stability AI برای موزیک و کاور |
+| AVALAI_API_KEY | کلید AvvalAI (fallback داخل ایران) |
+| OPENROUTER_API_KEY | کلید OpenRouter (fallback سوم) |
+| PIPELINE_MOCK | true برای تست بدون API |
+| MUSIC_PROVIDER | stability / elevenlabs / auto (پیش‌فرض: auto) |
+
+## معماری
+
+- **Backend**: TanStack Start + Nitro (node-server preset)
+- **Database**: SQLite (data/jobs.db) با WAL mode
+- **Storage**: فایل‌سیستم محلی (public/media/)
+- **AI**: Anthropic → AvvalAI → OpenRouter → local fallback
+- **Music**: Stability Audio 2.0 → ElevenLabs Sound → skip
+- **Voice**: ElevenLabs Instant Voice Cloning
+- **Cover Art**: Stability AI SD3.5
