@@ -45,7 +45,8 @@ liara env set --app songai \
   OPENROUTER_API_KEY=sk-or-v1-... \
   NODE_ENV=production
 
-# Deploy
+# Deploy (باید از داخل پوشه project-elevate اجرا شود)
+cd project-elevate
 liara deploy --app songai --port 3000
 ```
 
