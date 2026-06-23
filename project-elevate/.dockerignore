@@ -5,8 +5,9 @@ dist
 .tanstack
 data
 public/media
-*.local
+.env*.local
 .env.local
-.env.*.local
 .git
 .wrangler
+*.log
+.DS_Store

@@ -53,6 +53,10 @@
   --animate-ripple: ripple 1.6s ease-out infinite;
   --animate-spin-slow: spin 14s linear infinite;
   --animate-bounce-in: bounce-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-blob: blob 14s ease-in-out infinite;
+  --animate-blob-alt: blob-alt 18s ease-in-out infinite;
+  --animate-progress-fill: progress-fill 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-confetti: confetti-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(12px); }
@@ -85,6 +89,24 @@
     0%   { transform: scale(0.6); opacity: 0; }
     60%  { transform: scale(1.08); opacity: 1; }
     100% { transform: scale(1); }
+  }
+  @keyframes blob {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%       { transform: translate(40px, -30px) scale(1.08); }
+    66%       { transform: translate(-20px, 20px) scale(0.94); }
+  }
+  @keyframes blob-alt {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    40%       { transform: translate(-35px, 25px) scale(1.1); }
+    70%       { transform: translate(25px, -15px) scale(0.92); }
+  }
+  @keyframes progress-fill {
+    from { width: 0%; }
+  }
+  @keyframes confetti-pop {
+    0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+    60%  { transform: scale(1.15) rotate(3deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
   }
 }
 
@@ -284,6 +306,33 @@
     box-shadow: 8px 8px 0 0 color-mix(in oklab, var(--color-primary) 25%, transparent);
   }
 
+  .cinematic-glass {
+    background: linear-gradient(160deg,
+      color-mix(in oklab, var(--color-card) 85%, transparent),
+      color-mix(in oklab, var(--color-background) 80%, transparent)
+    );
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--color-accent) 15%, transparent),
+      0 24px 64px -16px color-mix(in oklab, var(--color-primary) 30%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .neon-glow-text {
+    text-shadow:
+      0 0 20px color-mix(in oklab, var(--color-accent) 80%, transparent),
+      0 0 40px color-mix(in oklab, var(--color-primary) 40%, transparent);
+  }
+
+  .progress-bar-fill {
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    box-shadow: 0 0 12px color-mix(in oklab, var(--color-accent) 70%, transparent);
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   .glow-ring {
     box-shadow:
       0 0 0 1px color-mix(in oklab, var(--color-accent) 20%, transparent),
@@ -318,6 +367,9 @@
   .animate-ripple { animation: var(--animate-ripple); }
   .animate-spin-slow { animation: var(--animate-spin-slow); }
   .animate-bounce-in { animation: var(--animate-bounce-in); }
+  .animate-blob { animation: var(--animate-blob); }
+  .animate-blob-alt { animation: var(--animate-blob-alt); }
+  .animate-confetti { animation: var(--animate-confetti); }
 
   .bg-tape { background-color: var(--color-tape); }
   .bg-tape-deep { background-color: var(--color-tape-deep); }
