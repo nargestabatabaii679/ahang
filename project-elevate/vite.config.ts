@@ -16,5 +16,7 @@ export default defineConfig({
   // better-sqlite3 and local filesystem are not compatible with Cloudflare Workers.
   nitro: {
     preset: "node-server",
+    // Ensure the server listens on all interfaces in production (required by Liara/Docker)
+    devServer: { host: "0.0.0.0" },
   },
 });

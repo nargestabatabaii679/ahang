@@ -25,8 +25,11 @@ COPY --from=builder /app/.output /app/.output
 RUN mkdir -p /app/data /app/public/media
 
 EXPOSE 3000
+
 ENV PORT=3000
+ENV NITRO_PORT=3000
 ENV HOST=0.0.0.0
+ENV NITRO_HOST=0.0.0.0
 ENV NODE_ENV=production
 
-CMD ["npm", "run", "start"]
+CMD ["node", "/app/.output/server/index.mjs"]
