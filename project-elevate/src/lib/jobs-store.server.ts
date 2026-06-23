@@ -10,7 +10,8 @@ import { join } from "path";
 import { Job, JobStatus, StageId, StageStatus, STAGE_ORDER } from "./types";
 
 // Keep the DB file next to the project root, outside src/
-const DB_DIR = join(process.cwd(), "data");
+const DB_DIR =
+  process.env.NODE_ENV === "production" ? "/app/data" : join(process.cwd(), "data");
 mkdirSync(DB_DIR, { recursive: true });
 const DB_PATH = join(DB_DIR, "jobs.db");
 

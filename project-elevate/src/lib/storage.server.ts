@@ -7,7 +7,11 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
-const MEDIA_DIR = join(process.cwd(), "public", "media");
+// In production Docker (/app), use absolute path. In dev, relative to cwd.
+const MEDIA_DIR =
+  process.env.NODE_ENV === "production"
+    ? "/app/public/media"
+    : join(process.cwd(), "public", "media");
 const MEDIA_URL_PREFIX = "/media";
 
 mkdirSync(MEDIA_DIR, { recursive: true });
@@ -66,7 +70,7 @@ export async function fetchBytes(url: string): Promise<Uint8Array> {
   // Handle local /media/ paths
   if (url.startsWith("/media/")) {
     const { readFileSync } = await import("fs");
-    const filePath = join(process.cwd(), "public", url);
+    const filePath = join(MEDIA_DIR, url.slice("/media/".length));
     return new Uint8Array(readFileSync(filePath));
   }
   const res = await fetch(url);

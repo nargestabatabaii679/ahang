@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   DownloadSimple,
@@ -13,20 +13,157 @@ import {
   LinkSimple,
   Check,
   Play,
+  Pause,
   type Icon,
 } from "@phosphor-icons/react";
 
 interface ResultViewProps {
   recipientName: string;
-  result: { videoUrl?: string; audioUrl?: string; musicUrl?: string; lyrics?: string; coverArtUrl?: string };
+  result: { videoUrl?: string; audioUrl?: string; musicUrl?: string; musicError?: string; lyrics?: string; coverArtUrl?: string };
   jobId?: string | null;
   onRestart: () => void;
 }
 
 export function ResultView({ recipientName, result, jobId, onRestart }: ResultViewProps) {
-  const { videoUrl, audioUrl, musicUrl, lyrics, coverArtUrl } = result;
+  const { videoUrl, audioUrl, musicUrl, musicError, lyrics, coverArtUrl } = result;
   const [keepsakeState, setKeepsakeState] = useState<"idle" | "loading" | "error">("idle");
   const [copied, setCopied] = useState(false);
+
+  const voiceRef = useRef<HTMLAudioElement | null>(null);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.25);
+  const [localMusicError, setLocalMusicError] = useState<string | null>(null);
+  const [musicRetrying, setMusicRetrying] = useState(false);
+
+  useEffect(() => {
+    if (musicRef.current) {
+      musicRef.current.volume = musicVolume;
+      musicRef.current.loop = true;
+    }
+    if (voiceRef.current) voiceRef.current.volume = 1;
+  }, [musicVolume, musicUrl, audioUrl]);
+
+  // Wait for a media element to be playable, with a timeout.
+  const waitCanPlay = (el: HTMLAudioElement, timeoutMs = 5000) =>
+    new Promise<void>((resolve, reject) => {
+      if (el.readyState >= 3) return resolve();
+      const cleanup = () => {
+        el.removeEventListener("canplaythrough", onReady);
+        el.removeEventListener("canplay", onReady);
+        el.removeEventListener("error", onErr);
+        clearTimeout(t);
+      };
+      const onReady = () => { cleanup(); resolve(); };
+      const onErr = () => { cleanup(); reject(new Error("media error")); };
+      const t = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, timeoutMs);
+      el.addEventListener("canplaythrough", onReady, { once: true });
+      el.addEventListener("canplay", onReady, { once: true });
+      el.addEventListener("error", onErr, { once: true });
+      try { el.load(); } catch {}
+    });
+
+  const prepareMusicWithRetry = async (m: HTMLAudioElement, retries = 2): Promise<boolean> => {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        if (i > 0) setMusicRetrying(true);
+        await waitCanPlay(m, 6000);
+        setMusicRetrying(false);
+        return true;
+      } catch (e) {
+        console.warn(`[music] attempt ${i + 1} failed`, e);
+        if (i < retries) await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+    setMusicRetrying(false);
+    setLocalMusicError("موسیقی پس‌زمینه قابل پخش نشد — فقط صدا پخش می‌شود.");
+    return false;
+  };
+
+  const togglePlay = async () => {
+    const v = voiceRef.current;
+    const m = musicRef.current;
+    if (!v && !m) return;
+    if (isPlaying) {
+      v?.pause();
+      m?.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    // Prepare both in parallel, but voice is independent of music success.
+    const voiceReady = v ? waitCanPlay(v, 6000).then(() => true).catch(() => false) : Promise.resolve(false);
+    const musicReady = m ? prepareMusicWithRetry(m, 2) : Promise.resolve(false);
+    const [vOk, mOk] = await Promise.all([voiceReady, musicReady]);
+
+    // Reset positions for tight sync
+    if (v && vOk) v.currentTime = 0;
+    if (m && mOk) m.currentTime = 0;
+
+    const playPromises: Promise<unknown>[] = [];
+    if (v && vOk) playPromises.push(v.play().catch((e) => { console.warn("voice play failed", e); }));
+    if (m && mOk) playPromises.push(m.play().catch((e) => {
+      console.warn("music play failed", e);
+      setLocalMusicError("موسیقی پس‌زمینه پخش نشد.");
+    }));
+    await Promise.all(playPromises);
+    if (vOk || mOk) setIsPlaying(true);
+  };
+
+  // Watch music stalls — if it stalls for 3s while playing, drop it (voice continues).
+  useEffect(() => {
+    const m = musicRef.current;
+    if (!m) return;
+    let stallTimer: ReturnType<typeof setTimeout> | null = null;
+    const onStall = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        console.warn("[music] stalled >3s, dropping background music");
+        m.pause();
+        setLocalMusicError("موسیقی پس‌زمینه قطع شد — صدا ادامه دارد.");
+      }, 3000);
+    };
+    const onResume = () => { if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; } };
+    const onErr = () => {
+      console.warn("[music] error event");
+      setLocalMusicError("خطا در بارگذاری موسیقی پس‌زمینه.");
+      m.pause();
+    };
+    m.addEventListener("stalled", onStall);
+    m.addEventListener("waiting", onStall);
+    m.addEventListener("playing", onResume);
+    m.addEventListener("canplaythrough", onResume);
+    m.addEventListener("error", onErr);
+    return () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      m.removeEventListener("stalled", onStall);
+      m.removeEventListener("waiting", onStall);
+      m.removeEventListener("playing", onResume);
+      m.removeEventListener("canplaythrough", onResume);
+      m.removeEventListener("error", onErr);
+    };
+  }, [musicUrl]);
+
+  useEffect(() => {
+    const v = voiceRef.current;
+    if (!v) return;
+    const onEnd = () => {
+      musicRef.current?.pause();
+      setIsPlaying(false);
+    };
+    v.addEventListener("ended", onEnd);
+    return () => v.removeEventListener("ended", onEnd);
+  }, [audioUrl]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try { voiceRef.current?.pause(); } catch {}
+      try { musicRef.current?.pause(); } catch {}
+    };
+  }, []);
+
+
 
   const downloadKeepsake = async () => {
     if (!jobId) return;
@@ -113,12 +250,60 @@ export function ResultView({ recipientName, result, jobId, onRestart }: ResultVi
                 <MusicNotes className="h-9 w-9" />
               </span>
             )}
-            <audio src={audioUrl} controls className="w-full" aria-label={`آهنگ هدیه برای ${recipientName}`} />
+            <div className="flex w-full flex-col items-stretch gap-3">
+              <button
+                type="button"
+                onClick={togglePlay}
+                className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-primary)] bg-[var(--color-primary)] px-4 py-3 text-sm font-black text-[var(--color-primary-foreground)] shadow-[4px_4px_0_0_var(--color-accent)] transition hover:-translate-y-0.5"
+                aria-label={isPlaying ? "توقف" : "پخش آهنگ"}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" weight="fill" /> : <Play className="h-4 w-4" weight="fill" />}
+                {isPlaying ? "توقف" : "پخش هدیه"}
+              </button>
+              <audio ref={voiceRef} src={audioUrl} controls className="w-full" aria-label={`آهنگ هدیه برای ${recipientName}`} />
+              {musicUrl && (
+                <>
+                  <audio ref={musicRef} src={musicUrl} preload="auto" crossOrigin="anonymous" aria-hidden />
+                  <label className="flex items-center gap-3 text-xs text-[var(--color-muted-foreground)]">
+                    <MusicNotes className="h-4 w-4 shrink-0" />
+                    صدای موسیقی پس‌زمینه
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={musicVolume}
+                      onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                      className="flex-1"
+                      aria-label="میزان صدای موسیقی پس‌زمینه"
+                    />
+                  </label>
+                </>
+              )}
+              {musicUrl && musicRetrying && (
+                <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
+                  ⏳ در حال آماده‌سازی موسیقی پس‌زمینه…
+                </p>
+              )}
+              {musicUrl && localMusicError && (
+                <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
+                  🎵 {localMusicError}
+                </p>
+              )}
+              {!musicUrl && musicError && (
+                <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
+                  🎵 موسیقی پس‌زمینه ساخته نشد؛ فقط صدا پخش می‌شود.
+                  <span className="block opacity-60 mt-1 break-all">{musicError}</span>
+                </p>
+              )}
+            </div>
           </div>
         ) : null}
       </div>
 
       {/* Metadata chips */}
+
+
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         {videoUrl && <span className="sticker-chip" style={{ transform: "rotate(-3deg)" }}>🎬 ویدیو</span>}
         <span className="sticker-chip" style={{ transform: "rotate(2deg)" }}>🎙️ صدای خودت</span>
@@ -146,12 +331,7 @@ export function ResultView({ recipientName, result, jobId, onRestart }: ResultVi
         )}
         {audioUrl && (
           <a href={audioUrl} download className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5">
-            <MusicNotes className="h-4 w-4" /> دانلود صدای کلون
-          </a>
-        )}
-        {musicUrl && (
-          <a href={musicUrl} download className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5">
-            <MusicNotes className="h-4 w-4" /> دانلود موسیقی
+            <MusicNotes className="h-4 w-4" /> دانلود آهنگ
           </a>
         )}
         {lyrics && jobId && (

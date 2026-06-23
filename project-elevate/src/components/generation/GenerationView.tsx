@@ -12,7 +12,7 @@ interface JobSnapshot {
   progress: number;
   stages: StageState[];
   error?: string;
-  result?: { videoUrl?: string; audioUrl?: string; musicUrl?: string; lyrics?: string; coverArtUrl?: string };
+  result?: { videoUrl?: string; audioUrl?: string; musicUrl?: string; musicError?: string; lyrics?: string; coverArtUrl?: string };
 }
 
 interface GenerationViewProps {
