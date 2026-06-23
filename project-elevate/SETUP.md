@@ -23,11 +23,20 @@ npm run start   # راه‌اندازی سرور Node.js روی پورت 3000
 
 ## Deploy در Liara
 
+### روش ۱: خودکار با GitHub Actions (توصیه‌شده)
+
+۱. یک secret با نام `LIARA_TOKEN` در تنظیمات GitHub repository اضافه کن
+   (Settings → Secrets → Actions → New repository secret)
+۲. Token خودت را از [console.liara.ir/profile/api-tokens](https://console.liara.ir/profile/api-tokens) بگیر
+۳. Push به branch `main` → Deploy خودکار شروع می‌شه
+
+### روش ۲: Deploy دستی (از پوشه project-elevate)
+
 ```bash
-# نصب Liara CLI
+# نصب Liara CLI (یکبار)
 npm install -g @liara/cli
 
-# لاگین
+# لاگین (یکبار)
 liara login
 
 # ایجاد اپ (یکبار)
@@ -37,7 +46,7 @@ liara app create --name songai --platform docker
 liara disk create --app songai --name songai-data --size 1
 liara disk create --app songai --name songai-media --size 5
 
-# تنظیم متغیرهای محیطی
+# تنظیم متغیرهای محیطی (یکبار)
 liara env set --app songai \
   ANTHROPIC_API_KEY=sk-ant-... \
   ELEVENLABS_API_KEY=sk_... \
@@ -45,10 +54,15 @@ liara env set --app songai \
   OPENROUTER_API_KEY=sk-or-v1-... \
   NODE_ENV=production
 
-# Deploy (باید از داخل پوشه project-elevate اجرا شود)
+# Deploy - حتماً از داخل پوشه project-elevate اجرا کن
 cd project-elevate
-liara deploy --app songai --port 3000
+./deploy.sh
 ```
+
+> ⚠️ مشکل cache لیارا: اگر با خطای `COPY failed: no source files were specified` مواجه شدی، از `--no-cache` استفاده کن:
+> ```bash
+> liara deploy --app songai --port 3000 --no-cache
+> ```
 
 ## متغیرهای محیطی
 
