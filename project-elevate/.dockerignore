@@ -1,5 +1,4 @@
 node_modules
-.output
 dist
 .nitro
 .tanstack
@@ -11,3 +10,15 @@ public/media
 .wrangler
 *.log
 .DS_Store
+src
+public
+supabase
+*.ts
+*.tsx
+*.js
+*.jsx
+*.html
+*.css
+*.json
+!package.json
+!package-lock.json

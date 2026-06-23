@@ -1,21 +1,15 @@
 FROM node:22-alpine
 WORKDIR /app
 
-# Build tools for better-sqlite3 native module
+# Native compilation tools for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
-# Dependencies (cached layer - only re-runs if package*.json changes)
+# Production dependencies (cached layer - only re-runs when package files change)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --omit=dev
 
-# Source code + config files
-COPY . .
-
-# Build (produces .output/server/index.mjs)
-RUN npm run build
-
-# Remove dev dependencies after build
-RUN npm prune --omit=dev
+# Pre-built server artifacts (built before deploy - see deploy.sh)
+COPY .output ./.output
 
 RUN mkdir -p /app/data /app/public/media
 

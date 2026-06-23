@@ -1,18 +1,39 @@
 #!/bin/bash
 set -e
+cd "$(dirname "$0")"
 
-# This script can be run from EITHER the repo root OR project-elevate/
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+echo ""
+echo "╔══════════════════════════════════╗"
+echo "║     Liara Deploy — AHang App     ║"
+echo "╚══════════════════════════════════╝"
+echo ""
 
-echo "=== Liara Deploy ($(basename "$SCRIPT_DIR")) ==="
-
+# 1. Check liara CLI
 if ! command -v liara &>/dev/null; then
-  echo "ERROR: liara CLI not found. Run: npm install -g @liara/cli"
+  echo "✗ liara CLI not found. Install: npm install -g @liara/cli"
   exit 1
 fi
 
-echo ">>> Deploying with --no-cache (clears stale build layers)..."
-liara deploy --app songai --port 3000 --no-cache
+# 2. Install dependencies if needed
+if [ ! -d node_modules ]; then
+  echo "→ Installing dependencies..."
+  npm ci
+fi
 
-echo "=== Done ==="
+# 3. Build the app
+echo "→ Building app..."
+npm run build
+
+# 4. Verify build output exists
+if [ ! -f .output/server/index.mjs ]; then
+  echo "✗ Build failed: .output/server/index.mjs not found"
+  exit 1
+fi
+echo "✓ Build successful"
+
+# 5. Deploy to Liara
+echo "→ Deploying to Liara..."
+liara deploy --app songai --port 3000
+
+echo ""
+echo "✓ Deploy complete!"

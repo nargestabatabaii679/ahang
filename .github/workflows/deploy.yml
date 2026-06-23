@@ -1,4 +1,4 @@
-name: Build & Deploy to Liara
+name: Deploy to Liara
 
 on:
   push:
@@ -31,13 +31,13 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Verify build output
+      - name: Verify build
         run: test -f .output/server/index.mjs
 
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
-      - name: Deploy to Liara
-        run: liara deploy --app songai --port 3000 --no-cache
+      - name: Deploy
+        run: liara deploy --app songai --port 3000
         env:
           LIARA_TOKEN: ${{ secrets.LIARA_TOKEN }}
