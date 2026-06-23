@@ -8,6 +8,10 @@ import {
   PaperPlaneTilt,
   Play,
   VinylRecord,
+  Star,
+  CheckCircle,
+  Lightning,
+  Gift,
 } from "@phosphor-icons/react";
 import { Waveform } from "@/components/Waveform";
 
@@ -31,12 +35,33 @@ const steps = [
   { icon: Microphone, counter: "۰۳", title: "صداش رو بسپار", body: "۱۰ ثانیه ضبط کافیه تا صداش واقعی کلون بشه.", time: "۱۰ ثانیه" },
 ];
 
+const features = [
+  { icon: Lightning, title: "صدای کلون‌شده واقعی", body: "با فقط ۳۰ ثانیه صدا، هوش مصنوعی صدای کسی که دوستش داری را برای خواندن کلون می‌کند." },
+  { icon: MusicNotes, title: "ترانه اختصاصی", body: "هر ترانه با نام، احساس، و مناسبت منحصربه‌فرد ساخته می‌شود. کپی نیست، خلق است." },
+  { icon: ImageIcon, title: "ویدیوی متحرک", body: "عکس دریافت‌کننده در ویدیو زنده می‌شود و با لب‌خوانی آهنگ را می‌خواند." },
+  { icon: Gift, title: "لینک هدیه", body: "یک لینک قابل اشتراک‌گذاری بگیر و با واتس‌اپ، تلگرام یا هر پلتفرمی ارسال کن." },
+  { icon: CheckCircle, title: "بدون ثبت‌نام", body: "کافی است وارد سایت شوی و شروع کنی. هیچ اکانتی نیاز نیست." },
+  { icon: Star, title: "کیفیت بالا", body: "موسیقی باکیفیت ۱۹۲kbps، ویدیوی HD، و پوشش اختصاصی آهنگ." },
+];
+
+const testimonials = [
+  { name: "نگین م.", occasion: "هدیه تولد مادر", text: "هرگز فکر نمی‌کردم مادرم با شنیدن آهنگ گریه کند. صدای خودم بود که برایش می‌خواند!" },
+  { name: "آرمان ک.", occasion: "سالگرد ازدواج", text: "جای هدیه‌های معمولی را گرفت. همسرم هنوز هم بارها گوش می‌دهد. واقعاً خاص بود." },
+  { name: "مریم ص.", occasion: "تشکر از دوست", text: "دوستم باور نمی‌کرد که این صدای واقعی من است. کلون صدا جادویی بود." },
+  { name: "داریوش ت.", occasion: "تولد فرزند", text: "یک آهنگ برای تولد دخترم ساختم. حالا هر شب می‌خواهد گوش بدهد." },
+  { name: "سحر ف.", occasion: "عذرخواهی", text: "وقتی کلمات کافی نیستند، یک آهنگ شخصی بهتر از هر چیزی حرف می‌زند." },
+  { name: "بهروز ع.", occasion: "قدردانی از همکار", text: "برای بازنشستگی رئیسم ساختم. همه دفتر گریه کردند — از شادی!" },
+];
+
 function HomePage() {
   return (
     <main id="main" className="relative overflow-hidden">
-      {/* Ambient glow */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 right-1/4 h-72 w-72 rounded-full bg-[var(--color-primary)]/25 blur-[120px]" />
-      <div aria-hidden className="pointer-events-none absolute top-1/3 left-0 h-64 w-64 rounded-full bg-[var(--color-accent)]/15 blur-[100px]" />
+      {/* Cinematic ambient blobs — from UI UX Pro Max "Modern Dark Cinema" pattern */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="animate-blob absolute -top-40 right-1/4 h-96 w-96 rounded-full bg-[var(--color-primary)]/20 blur-[100px]" />
+        <div className="animate-blob-alt absolute top-1/2 -left-20 h-80 w-80 rounded-full bg-[var(--color-accent)]/12 blur-[90px]" style={{ animationDelay: "-6s" }} />
+        <div className="animate-blob absolute bottom-1/4 right-0 h-64 w-64 rounded-full bg-[var(--color-primary)]/10 blur-[80px]" style={{ animationDelay: "-10s" }} />
+      </div>
 
       {/* NAV */}
       <header className="container relative flex items-center justify-between pt-8">
@@ -211,6 +236,72 @@ function HomePage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <p className="mt-4 text-xs text-[var(--color-muted-foreground)]">بدون ثبت‌نام · کمتر از ۲ دقیقه</p>
+        </div>
+      </section>
+
+      {/* FEATURES — from UI UX Pro Max "Feature-Rich Showcase" pattern */}
+      <section className="container relative pb-20">
+        <div className="mb-10 flex items-center justify-center gap-3">
+          <span aria-hidden className="thread-divider w-10" />
+          <h2 className="font-counter text-xs uppercase tracking-[0.35em] text-[var(--color-accent)]">WHY SONGAI · چرا songai</h2>
+          <span aria-hidden className="thread-divider w-10" />
+        </div>
+
+        <div className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f, i) => (
+            <div key={f.title} className="cinematic-glass group rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-accent)]/30">
+              <span aria-hidden className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)]/15 text-[var(--color-primary)]">
+                <f.icon className="h-5 w-5" weight="fill" />
+              </span>
+              <h3 className="font-black text-sm text-[var(--color-foreground)]">{f.title}</h3>
+              <p className="mt-1.5 text-xs leading-6 text-[var(--color-muted-foreground)]">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SOCIAL PROOF — from UI UX Pro Max "Social Proof" landing pattern */}
+      <section className="container relative pb-24">
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <span aria-hidden className="thread-divider w-10" />
+          <h2 className="font-counter text-xs uppercase tracking-[0.35em] text-[var(--color-accent)]">TESTIMONIALS · نظرات</h2>
+          <span aria-hidden className="thread-divider w-10" />
+        </div>
+
+        <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {testimonials.map((t, i) => {
+            const tilt = i % 3 === 0 ? "-rotate-1" : i % 3 === 1 ? "rotate-0" : "rotate-1";
+            return (
+              <div key={i} className={`sticker-card ${tilt} p-5 transition hover:rotate-0`}>
+                <div className="mb-3 flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, s) => (
+                    <Star key={s} className="h-3.5 w-3.5 text-[var(--color-accent)]" weight="fill" />
+                  ))}
+                </div>
+                <p className="text-sm leading-7 text-[var(--color-foreground)]">«{t.text}»</p>
+                <div className="mt-4 flex items-center gap-2 border-t border-dashed border-[var(--color-accent)]/20 pt-3">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--color-primary)]/20 text-xs font-black text-[var(--color-primary)]">
+                    {t.name[0]}
+                  </span>
+                  <div>
+                    <p className="text-xs font-black">{t.name}</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">{t.occasion}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link
+            to="/create"
+            className="neon-cta neon-cta-hover inline-flex h-14 items-center justify-center gap-2 px-10 text-base active:translate-y-0.5"
+          >
+            <Gift className="h-5 w-5" weight="fill" />
+            بساز همین الان
+          </Link>
+          <p className="mt-3 text-xs text-[var(--color-muted-foreground)]">رایگان · بدون ثبت‌نام · کمتر از ۲ دقیقه</p>
         </div>
       </section>
 
