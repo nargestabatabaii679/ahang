@@ -1,11 +1,9 @@
 {
-  "platform": "docker",
+  "platform": "node",
   "port": 3000,
   "app": "songai",
   "build": {
-    "args": {
-      "NODE_ENV": "production"
-    }
+    "command": "npm run build"
   },
   "disks": [
     {
