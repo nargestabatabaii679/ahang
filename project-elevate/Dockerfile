@@ -3,12 +3,10 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY package.json package-lock.json ./
-RUN npm ci
-
+# Copy everything first (source + configs), then install + build
 COPY . .
+RUN npm ci
 RUN npm run build
-
 RUN npm prune --omit=dev
 
 RUN mkdir -p /app/data /app/public/media
