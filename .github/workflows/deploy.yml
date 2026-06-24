@@ -58,54 +58,52 @@ jobs:
 
       - name: Create Liara app via API (if not exists)
         run: |
-          # Get Daneshavaran team ID
-          TEAMS=$(curl -s "https://api.liara.ir/v1/teams" \
-            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
-          echo "Teams: $TEAMS"
-          TEAM_ID=$(echo "$TEAMS" | python3 -c "
+          TEAM_NAME="DANESHAVARAN2"
+
+          # Try to get team ID from different API endpoints
+          TEAM_ID=$(curl -s "https://api.liara.ir/v2/teams" \
+            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" | python3 -c "
           import sys, json
-          data = json.load(sys.stdin)
-          teams = data.get('teams', data.get('data', data))
-          if isinstance(teams, list):
-              for t in teams:
-                  name = t.get('name','') or t.get('title','')
-                  if 'daneshavaran' in name.lower() or 'danes' in name.lower():
-                      print(t.get('_id', t.get('id','')))
-                      break
+          try:
+              data = json.load(sys.stdin)
+              teams = data.get('teams', data.get('data', []))
+              if isinstance(teams, list):
+                  for t in teams:
+                      name = (t.get('name','') or t.get('title','')).upper()
+                      if 'DANESHAVARAN2' in name or 'DANESHAVARAN' in name:
+                          print(t.get('_id', t.get('id','')))
+                          break
+          except: pass
           " 2>/dev/null || echo "")
+
+          if [ -z "$TEAM_ID" ]; then
+            TEAM_ID=$(curl -s "https://api.liara.ir/v1/me" \
+              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              teams = data.get('teams', data.get('user', {}).get('teams', []))
+              if isinstance(teams, list):
+                  for t in teams:
+                      name = (t.get('name','') or t.get('title','')).upper()
+                      if 'DANESHAVARAN' in name:
+                          print(t.get('_id', t.get('id','')))
+                          break
+          except: pass
+          " 2>/dev/null || echo "")
+          fi
+
           echo "Team ID: $TEAM_ID"
 
-          # Get network ID for koshtyiran-net (within team scope)
-          if [ -n "$TEAM_ID" ]; then
-            NETWORKS=$(curl -s "https://api.liara.ir/v1/networks?teamID=$TEAM_ID" \
-              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
-          else
-            NETWORKS=$(curl -s "https://api.liara.ir/v1/networks" \
-              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
-          fi
-          echo "Networks: $NETWORKS"
-          NETWORK_ID=$(echo "$NETWORKS" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          nets = data.get('networks', data.get('data', data))
-          if isinstance(nets, list):
-              for n in nets:
-                  name = n.get('name','') or n.get('title','')
-                  if 'koshtyiran' in name.lower() or 'kosht' in name.lower():
-                      print(n.get('_id', n.get('id','')))
-                      break
-          " 2>/dev/null || echo "")
-          echo "Network ID: $NETWORK_ID"
+          # Network ID (hardcoded from previous successful run)
+          NETWORK_ID="6a118b8305caf38aface4a47"
 
-          # Build JSON payload
-          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"free\""
+          # Build payload
+          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"basic\""
           if [ -n "$TEAM_ID" ]; then
             PAYLOAD="$PAYLOAD,\"teamID\":\"$TEAM_ID\""
           fi
-          if [ -n "$NETWORK_ID" ]; then
-            PAYLOAD="$PAYLOAD,\"network\":\"$NETWORK_ID\""
-          fi
-          PAYLOAD="$PAYLOAD}"
+          PAYLOAD="$PAYLOAD,\"network\":\"$NETWORK_ID\"}"
           echo "Payload: $PAYLOAD"
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
