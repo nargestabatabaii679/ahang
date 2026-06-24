@@ -63,16 +63,16 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
           echo "Networks: $NETWORKS"
           NETWORK_ID=$(echo "$NETWORKS" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-nets = data.get('networks', data.get('data', data))
-if isinstance(nets, list):
-    for n in nets:
-        name = n.get('name','') or n.get('title','')
-        if 'koshtyiran' in name.lower() or 'kosht' in name.lower():
-            print(n.get('_id', n.get('id','')))
-            break
-" 2>/dev/null || echo "")
+          import sys, json
+          data = json.load(sys.stdin)
+          nets = data.get('networks', data.get('data', data))
+          if isinstance(nets, list):
+              for n in nets:
+                  name = n.get('name','') or n.get('title','')
+                  if 'koshtyiran' in name.lower() or 'kosht' in name.lower():
+                      print(n.get('_id', n.get('id','')))
+                      break
+          " 2>/dev/null || echo "")
           echo "Network ID: $NETWORK_ID"
 
           # Build JSON - with or without network
