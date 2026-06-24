@@ -77,7 +77,7 @@ jobs:
 
           # Build JSON - with or without network
           if [ -n "$NETWORK_ID" ]; then
-            PAYLOAD="{\"name\":\"songai\",\"planID\":\"ir-small\",\"bundlePlanID\":\"free\",\"network\":\"$NETWORK_ID\"}"
+            PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"free\",\"network\":\"$NETWORK_ID\"}"
           else
             PAYLOAD='{"name":"songai","planID":"ir-small","bundlePlanID":"free"}'
           fi
