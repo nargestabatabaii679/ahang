@@ -58,55 +58,16 @@ jobs:
 
       - name: Create Liara app via API (if not exists)
         run: |
-          TEAM_NAME="DANESHAVARAN2"
-
-          # Try to get team ID from different API endpoints
-          TEAM_ID=$(curl -s "https://api.liara.ir/v2/teams" \
-            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" | python3 -c "
-          import sys, json
-          try:
-              data = json.load(sys.stdin)
-              teams = data.get('teams', data.get('data', []))
-              if isinstance(teams, list):
-                  for t in teams:
-                      name = (t.get('name','') or t.get('title','')).upper()
-                      if 'DANESHAVARAN2' in name or 'DANESHAVARAN' in name:
-                          print(t.get('_id', t.get('id','')))
-                          break
-          except: pass
-          " 2>/dev/null || echo "")
-
-          if [ -z "$TEAM_ID" ]; then
-            TEAM_ID=$(curl -s "https://api.liara.ir/v1/me" \
-              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" | python3 -c "
-          import sys, json
-          try:
-              data = json.load(sys.stdin)
-              teams = data.get('teams', data.get('user', {}).get('teams', []))
-              if isinstance(teams, list):
-                  for t in teams:
-                      name = (t.get('name','') or t.get('title','')).upper()
-                      if 'DANESHAVARAN' in name:
-                          print(t.get('_id', t.get('id','')))
-                          break
-          except: pass
-          " 2>/dev/null || echo "")
-          fi
-
+          TEAM_ID="687f2bfec24fa7e8e27436cb"
+          NETWORK_ID="6a118b8305caf38aface4a47"
           echo "Team ID: $TEAM_ID"
 
-          # Network ID (hardcoded from previous successful run)
-          NETWORK_ID="6a118b8305caf38aface4a47"
-
-          # Build payload
-          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"basic\""
-          if [ -n "$TEAM_ID" ]; then
-            PAYLOAD="$PAYLOAD,\"teamID\":\"$TEAM_ID\""
-          fi
-          PAYLOAD="$PAYLOAD,\"network\":\"$NETWORK_ID\"}"
+          # Try creating app under team (try different field names)
+          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"basic\",\"network\":\"$NETWORK_ID\"}"
           echo "Payload: $PAYLOAD"
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
+          # Try with teamID as query param
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects?teamID=$TEAM_ID" \
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
