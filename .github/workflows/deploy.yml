@@ -58,14 +58,37 @@ jobs:
 
       - name: Create Liara app via API (if not exists)
         run: |
+          # Get network ID for koshtyiran-net
+          NETWORKS=$(curl -s "https://api.liara.ir/v1/networks" \
+            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
+          echo "Networks: $NETWORKS"
+          NETWORK_ID=$(echo "$NETWORKS" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+nets = data.get('networks', data.get('data', data))
+if isinstance(nets, list):
+    for n in nets:
+        name = n.get('name','') or n.get('title','')
+        if 'koshtyiran' in name.lower() or 'kosht' in name.lower():
+            print(n.get('_id', n.get('id','')))
+            break
+" 2>/dev/null || echo "")
+          echo "Network ID: $NETWORK_ID"
+
+          # Build JSON - with or without network
+          if [ -n "$NETWORK_ID" ]; then
+            PAYLOAD="{\"name\":\"songai\",\"planID\":\"ir-small\",\"type\":\"docker\",\"network\":\"$NETWORK_ID\"}"
+          else
+            PAYLOAD='{"name":"songai","planID":"ir-small","type":"docker"}'
+          fi
+
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d '{"name":"songai","planID":"ir-small","type":"docker","network":"koshtyiran-net"}')
+            -d "$PAYLOAD")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
           echo "HTTP $HTTP_CODE: $BODY"
-          # 201=created, 409=already exists - both are fine
           if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "409" ] && [ "$HTTP_CODE" != "200" ]; then
             echo "App creation returned unexpected code $HTTP_CODE, continuing anyway..."
           fi
