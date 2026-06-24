@@ -77,9 +77,9 @@ jobs:
 
           # Build JSON - with or without network
           if [ -n "$NETWORK_ID" ]; then
-            PAYLOAD="{\"name\":\"songai\",\"planID\":\"ir-small\",\"bundlePlanID\":\"ir-small\",\"type\":\"docker\",\"network\":\"$NETWORK_ID\"}"
+            PAYLOAD="{\"name\":\"songai\",\"planID\":\"ir-small\",\"bundlePlanID\":\"free\",\"type\":\"docker\",\"network\":\"$NETWORK_ID\"}"
           else
-            PAYLOAD='{"name":"songai","planID":"ir-small","bundlePlanID":"ir-small","type":"docker"}'
+            PAYLOAD='{"name":"songai","planID":"ir-small","bundlePlanID":"free","type":"docker"}'
           fi
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
