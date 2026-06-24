@@ -58,7 +58,7 @@ jobs:
 
       - name: Create Liara app (if not exists)
         run: |
-          liara app create --app songai --platform docker --api-token ${{ secrets.LIARA_TOKEN }} || true
+          liara app create --app songai --platform docker --network koshtyiran-net --api-token ${{ secrets.LIARA_TOKEN }} || true
 
       - name: Deploy image to Liara
         run: |
