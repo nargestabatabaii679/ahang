@@ -1,0 +1,43 @@
+name: Deploy to Liara
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "project-elevate/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project-elevate
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: project-elevate/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Verify build
+        run: test -f .output/server/index.mjs
+
+      - name: Install Liara CLI
+        run: npm install -g @liara/cli
+
+      - name: Deploy
+        run: liara deploy --app songai --port 3000
+        env:
+          LIARA_TOKEN: ${{ secrets.LIARA_TOKEN }}

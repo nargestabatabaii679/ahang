@@ -2,6 +2,7 @@
   "platform": "docker",
   "port": 3000,
   "app": "songai",
+  "path": "project-elevate",
   "disks": [
     { "name": "songai-data", "mountTo": "/app/data" },
     { "name": "songai-media", "mountTo": "/app/public/media" }
