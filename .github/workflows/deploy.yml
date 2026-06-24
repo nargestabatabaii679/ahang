@@ -21,6 +21,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: project-elevate/package-lock.json
+
+      - name: Install dependencies
+        working-directory: project-elevate
+        run: npm ci
+
+      - name: Build app
+        working-directory: project-elevate
+        run: npm run build
+        env:
+          NITRO_PRESET: node-server
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
