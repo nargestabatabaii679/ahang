@@ -56,6 +56,20 @@ jobs:
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
+      - name: Create Liara app via API (if not exists)
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
+            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"project_id":"songai","plan_id":"small","type":"docker","network":"koshtyiran-net"}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "HTTP $HTTP_CODE: $BODY"
+          # 201=created, 409=already exists - both are fine
+          if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "409" ] && [ "$HTTP_CODE" != "200" ]; then
+            echo "App creation returned unexpected code $HTTP_CODE, continuing anyway..."
+          fi
+
       - name: Deploy image to Liara
         run: |
           liara deploy \
