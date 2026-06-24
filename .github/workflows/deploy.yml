@@ -58,9 +58,31 @@ jobs:
 
       - name: Create Liara app via API (if not exists)
         run: |
-          # Get network ID for koshtyiran-net
-          NETWORKS=$(curl -s "https://api.liara.ir/v1/networks" \
+          # Get Daneshavaran team ID
+          TEAMS=$(curl -s "https://api.liara.ir/v1/teams" \
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
+          echo "Teams: $TEAMS"
+          TEAM_ID=$(echo "$TEAMS" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          teams = data.get('teams', data.get('data', data))
+          if isinstance(teams, list):
+              for t in teams:
+                  name = t.get('name','') or t.get('title','')
+                  if 'daneshavaran' in name.lower() or 'danes' in name.lower():
+                      print(t.get('_id', t.get('id','')))
+                      break
+          " 2>/dev/null || echo "")
+          echo "Team ID: $TEAM_ID"
+
+          # Get network ID for koshtyiran-net (within team scope)
+          if [ -n "$TEAM_ID" ]; then
+            NETWORKS=$(curl -s "https://api.liara.ir/v1/networks?teamID=$TEAM_ID" \
+              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
+          else
+            NETWORKS=$(curl -s "https://api.liara.ir/v1/networks" \
+              -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}")
+          fi
           echo "Networks: $NETWORKS"
           NETWORK_ID=$(echo "$NETWORKS" | python3 -c "
           import sys, json
@@ -75,12 +97,16 @@ jobs:
           " 2>/dev/null || echo "")
           echo "Network ID: $NETWORK_ID"
 
-          # Build JSON - with or without network
-          if [ -n "$NETWORK_ID" ]; then
-            PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"standard\",\"network\":\"$NETWORK_ID\"}"
-          else
-            PAYLOAD='{"name":"songai","planID":"small-g2","bundlePlanID":"standard"}'
+          # Build JSON payload
+          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"free\""
+          if [ -n "$TEAM_ID" ]; then
+            PAYLOAD="$PAYLOAD,\"teamID\":\"$TEAM_ID\""
           fi
+          if [ -n "$NETWORK_ID" ]; then
+            PAYLOAD="$PAYLOAD,\"network\":\"$NETWORK_ID\""
+          fi
+          PAYLOAD="$PAYLOAD}"
+          echo "Payload: $PAYLOAD"
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
@@ -93,10 +119,17 @@ jobs:
             echo "App creation returned unexpected code $HTTP_CODE, continuing anyway..."
           fi
 
+          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
+
       - name: Deploy image to Liara
         run: |
+          EXTRA_ARGS=""
+          if [ -n "$TEAM_ID" ]; then
+            EXTRA_ARGS="--team-id $TEAM_ID"
+          fi
           liara deploy \
             --app songai \
             --port 3000 \
             --image ghcr.io/${{ github.repository }}/ahang-songai:latest \
-            --api-token ${{ secrets.LIARA_TOKEN }}
+            --api-token ${{ secrets.LIARA_TOKEN }} \
+            $EXTRA_ARGS
