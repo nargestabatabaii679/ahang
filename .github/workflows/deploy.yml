@@ -61,7 +61,7 @@ jobs:
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects" \
             -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d '{"name":"songai","plan_id":"small","type":"docker","network":"koshtyiran-net"}')
+            -d '{"name":"songai","planID":"small","type":"docker","network":"koshtyiran-net"}')
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
           echo "HTTP $HTTP_CODE: $BODY"
