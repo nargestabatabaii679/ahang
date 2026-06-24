@@ -61,6 +61,5 @@ jobs:
           liara deploy \
             --app songai \
             --port 3000 \
-            --image ghcr.io/${{ github.repository }}/ahang-songai:latest
-        env:
-          LIARA_TOKEN: ${{ secrets.LIARA_TOKEN }}
+            --image ghcr.io/${{ github.repository }}/ahang-songai:latest \
+            --api-token ${{ secrets.LIARA_TOKEN }}
