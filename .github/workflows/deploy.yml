@@ -56,16 +56,10 @@ jobs:
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
-      - name: Debug Liara disk commands
+      - name: Create disks if not exist
         run: |
-          echo "=== Liara CLI version ==="
-          liara --version
-          echo "=== Disk help ==="
-          liara disk --help 2>&1 || liara help disk 2>&1 || echo "No disk help found"
-          echo "=== Try list disks ==="
-          liara disk list --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
-          echo "=== Try create disk ==="
-          liara disk create songai-data --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
+          liara disk create --name songai-data --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
+          liara disk create --name songai-media --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
 
       - name: Deploy image to Liara
         run: |
