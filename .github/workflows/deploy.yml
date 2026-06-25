@@ -62,12 +62,11 @@ jobs:
           liara disk create --name songai-media --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
 
       - name: Make image public on ghcr.io
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -s -X PATCH \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/user/packages/container/ahang%2Fahang-songai" \
-            -d '{"visibility":"public"}' | jq '.visibility // .'
+          gh api --method PATCH /user/packages/container/ahang%2Fahang-songai \
+            -f visibility=public || echo "visibility change failed (may already be public)"
 
       - name: Deploy image to Liara
         run: |
