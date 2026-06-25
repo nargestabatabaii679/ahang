@@ -49,4 +49,4 @@ jobs:
             --port 3000 \
             --api-token ${{ secrets.LIARA_TOKEN }} \
             --team-id 687f2bfec24fa7e8e27436cb \
-            --no-app-logs
+            --debug
