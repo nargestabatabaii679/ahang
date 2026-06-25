@@ -1,12 +1,15 @@
-FROM node:22-bookworm-slim
+FROM node:22-alpine
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY .output ./.output
+
+# Remove glibc-compiled better-sqlite3 from Nitro output so alpine version is used
+RUN rm -rf /app/.output/server/node_modules/better-sqlite3
 
 RUN mkdir -p /app/data /app/public/media
 
