@@ -56,39 +56,11 @@ jobs:
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
-      - name: Create Liara app via API (if not exists)
-        run: |
-          TEAM_ID="687f2bfec24fa7e8e27436cb"
-          NETWORK_ID="6a118b8305caf38aface4a47"
-          echo "Team ID: $TEAM_ID"
-
-          # Try creating app under team (try different field names)
-          PAYLOAD="{\"name\":\"songai\",\"planID\":\"small-g2\",\"bundlePlanID\":\"basic\",\"network\":\"$NETWORK_ID\"}"
-          echo "Payload: $PAYLOAD"
-
-          # Try with teamID as query param
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.liara.ir/v1/projects?teamID=$TEAM_ID" \
-            -H "Authorization: Bearer ${{ secrets.LIARA_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
-          echo "HTTP $HTTP_CODE: $BODY"
-          if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "409" ] && [ "$HTTP_CODE" != "200" ]; then
-            echo "App creation returned unexpected code $HTTP_CODE, continuing anyway..."
-          fi
-
-          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
-
       - name: Deploy image to Liara
         run: |
-          EXTRA_ARGS=""
-          if [ -n "$TEAM_ID" ]; then
-            EXTRA_ARGS="--team-id $TEAM_ID"
-          fi
           liara deploy \
             --app songai \
             --port 3000 \
             --image ghcr.io/${{ github.repository }}/ahang-songai:latest \
             --api-token ${{ secrets.LIARA_TOKEN }} \
-            $EXTRA_ARGS
+            --team-id 687f2bfec24fa7e8e27436cb
