@@ -7,16 +7,11 @@ on:
       - "project-elevate/**"
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/ahang-songai
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -38,21 +33,6 @@ jobs:
         env:
           NITRO_PRESET: node-server
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./project-elevate
-          file: ./project-elevate/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository }}/ahang-songai:latest
-
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
@@ -61,18 +41,12 @@ jobs:
           liara disk create --name songai-data --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
           liara disk create --name songai-media --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb 2>&1 || true
 
-      - name: Make image public on ghcr.io
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api --method PATCH /user/packages/container/ahang%2Fahang-songai \
-            -f visibility=public || echo "visibility change failed (may already be public)"
-
-      - name: Deploy image to Liara
+      - name: Deploy to Liara
+        working-directory: project-elevate
         run: |
           liara deploy \
             --app songai \
             --port 3000 \
-            --image ghcr.io/${{ github.repository }}/ahang-songai:latest \
             --api-token ${{ secrets.LIARA_TOKEN }} \
-            --team-id 687f2bfec24fa7e8e27436cb
+            --team-id 687f2bfec24fa7e8e27436cb \
+            --no-app-logs
