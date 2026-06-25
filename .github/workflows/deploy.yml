@@ -56,6 +56,11 @@ jobs:
       - name: Install Liara CLI
         run: npm install -g @liara/cli
 
+      - name: Create disks if not exist
+        run: |
+          liara disk create songai-data --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb || true
+          liara disk create songai-media --app songai --size 1 --api-token ${{ secrets.LIARA_TOKEN }} --team-id 687f2bfec24fa7e8e27436cb || true
+
       - name: Deploy image to Liara
         run: |
           liara deploy \
