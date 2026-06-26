@@ -1,5 +1,18 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowRight, MusicNotes, Play } from "@phosphor-icons/react";
+import { useState } from "react";
+import {
+  ArrowRight,
+  MusicNotes,
+  Play,
+  DownloadSimple,
+  FileText,
+  WhatsappLogo,
+  TelegramLogo,
+  LinkSimple,
+  Check,
+  CircleNotch,
+  type Icon,
+} from "@phosphor-icons/react";
 import { getGiftJob } from "@/lib/gift.functions";
 
 export const Route = createFileRoute("/gift/$id")({
@@ -33,7 +46,44 @@ export const Route = createFileRoute("/gift/$id")({
 
 function GiftPage() {
   const data = Route.useLoaderData();
-  const { recipientName, videoUrl, audioUrl, coverArtUrl, lyrics } = data;
+  const { id: jobId, recipientName, videoUrl, audioUrl, coverArtUrl, lyrics } = data;
+
+  const [copied, setCopied] = useState(false);
+  const [keepsakeState, setKeepsakeState] = useState<"idle" | "loading" | "error">("idle");
+
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/gift/${jobId}` : "";
+  const shareText = `یک هدیه برای «${recipientName}» — یه آهنگ با صدای واقعی 🎵`;
+
+  const shareWhatsapp = () =>
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}`, "_blank");
+  const shareTelegram = () =>
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, "_blank");
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  const downloadKeepsake = async () => {
+    if (!jobId) return;
+    setKeepsakeState("loading");
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/keepsake`);
+      if (!res.ok) throw new Error("ساخت کیپ‌سیک ناموفق بود");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `songai-${jobId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setKeepsakeState("idle");
+    } catch {
+      setKeepsakeState("error");
+    }
+  };
 
   return (
     <main id="main" className="relative min-h-dvh py-10 sm:py-16">
@@ -48,16 +98,22 @@ function GiftPage() {
           <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">با صدای واقعی، فقط برای تو</p>
         </div>
 
+        {/* Media card */}
         <div className="sticker-card mt-10 rotate-1 overflow-hidden p-4 sm:p-5">
           {videoUrl ? (
-            <video
-              src={videoUrl}
-              poster={coverArtUrl}
-              controls
-              playsInline
-              className="aspect-square w-full bg-black object-cover"
-              aria-label={`ویدیوی هدیه برای ${recipientName}`}
-            />
+            <div className="relative">
+              <video
+                src={videoUrl}
+                poster={coverArtUrl}
+                controls
+                playsInline
+                className="aspect-square w-full bg-black object-cover"
+                aria-label={`ویدیوی هدیه برای ${recipientName}`}
+              />
+              <span aria-hidden className="font-display pointer-events-none absolute right-3 top-3 bg-[var(--color-accent)] px-3 py-1.5 text-xs text-[var(--color-accent-foreground)] shadow-[3px_3px_0_0_var(--color-primary)]">
+                برای «{recipientName}» ❤️
+              </span>
+            </div>
           ) : audioUrl ? (
             <div className="flex flex-col items-center gap-5 py-2">
               {coverArtUrl ? (
@@ -77,12 +133,60 @@ function GiftPage() {
           ) : null}
         </div>
 
+        {/* Lyrics */}
         {lyrics && (
           <div className="sticker-card mt-8 -rotate-1 p-6">
             <p className="font-counter mb-3 text-[10px] uppercase tracking-[0.2em] text-[var(--color-accent)]">side a · متن ترانه</p>
             <p className="whitespace-pre-line text-[15px] leading-[2] text-[var(--color-foreground)]">{lyrics}</p>
           </div>
         )}
+
+        {/* Downloads */}
+        <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {videoUrl && (
+            <a
+              href={videoUrl}
+              download
+              className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-primary)] bg-[var(--color-primary)] px-4 py-3 text-sm font-black text-[var(--color-primary-foreground)] shadow-[4px_4px_0_0_var(--color-accent)] transition hover:-translate-y-0.5"
+            >
+              <DownloadSimple className="h-4 w-4" /> دانلود ویدیو
+            </a>
+          )}
+          {audioUrl && (
+            <a
+              href={audioUrl}
+              download
+              className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5"
+            >
+              <MusicNotes className="h-4 w-4" /> دانلود آهنگ
+            </a>
+          )}
+          {lyrics && jobId && (
+            <button
+              onClick={downloadKeepsake}
+              disabled={keepsakeState === "loading"}
+              className="tap inline-flex items-center justify-center gap-2 border-2 border-[var(--color-accent)] bg-transparent px-4 py-3 text-sm font-black text-[var(--color-accent)] shadow-[4px_4px_0_0_var(--color-primary)] transition hover:-translate-y-0.5 disabled:opacity-50"
+            >
+              {keepsakeState === "loading" ? <CircleNotch className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              متن ترانه (PDF)
+            </button>
+          )}
+        </div>
+        {keepsakeState === "error" && (
+          <p className="mt-2 text-center text-xs text-[var(--color-danger)]">ساخت PDF فعلاً فعال نیست — دوباره تلاش کن</p>
+        )}
+
+        {/* Share */}
+        <div className="mt-8">
+          <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-[var(--color-muted-foreground)]">
+            این هدیه را با دیگران به اشتراک بگذار
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <ShareButton onClick={shareWhatsapp} icon={WhatsappLogo} label="واتس‌اپ" />
+            <ShareButton onClick={shareTelegram} icon={TelegramLogo} label="تلگرام" />
+            <ShareButton onClick={copyLink} icon={copied ? Check : LinkSimple} label={copied ? "کپی شد" : "کپی لینک"} />
+          </div>
+        </div>
 
         <div className="mt-10 text-center">
           <p className="text-sm text-[var(--color-muted-foreground)]">امیدواریم لبخند روی لبت بیاورد ❤️</p>
@@ -96,6 +200,20 @@ function GiftPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function ShareButton({ onClick, icon: I, label }: { onClick: () => void; icon: Icon; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="tap flex flex-col items-center justify-center gap-1.5 border-2 border-[var(--color-primary)]/40 bg-[var(--color-card)] py-3 text-[11px] font-black text-[var(--color-foreground)] transition hover:border-[var(--color-accent)] hover:-translate-y-0.5"
+    >
+      <I className="h-5 w-5" />
+      {label}
+    </button>
   );
 }
 

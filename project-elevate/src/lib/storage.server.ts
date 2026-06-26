@@ -36,6 +36,11 @@ function contentTypeFromName(name: string): string {
   }
 }
 
+/**
+ * Audio/video/image files served from /media/** are configured with
+ * Cache-Control: public, max-age=31536000, immutable via nitro routeRules
+ * in vite.config.ts. Filenames include the jobId so they are content-addressed.
+ */
 export async function savePublic(
   filename: string,
   data: ArrayBuffer | Uint8Array | Blob,

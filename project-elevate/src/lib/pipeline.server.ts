@@ -116,7 +116,10 @@ async function runMusicStage(job: Job): Promise<MusicStageResult> {
           await tryStabilityCoverArt();
         } catch (e2) {
           console.warn(`[pipeline] ElevenLabs music fallback failed: ${(e2 as Error).message}`);
+          result.musicError = `${msg} (ElevenLabs fallback: ${(e2 as Error).message})`;
         }
+      } else {
+        result.musicError = msg;
       }
     }
   }
