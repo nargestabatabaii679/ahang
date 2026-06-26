@@ -1,0 +1,558 @@
+{
+  "name": "SongAI - نمونه با داده‌های تستی",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jobs",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-create-job",
+      "name": "POST /api/jobs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "songai-create-job"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "jobs/:id",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-poll-job",
+      "name": "GET /api/jobs/:id",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 500],
+      "webhookId": "songai-poll-job"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst required = ['recipientName', 'relationship', 'occasion', 'genre', 'photoUrl', 'voiceUrl', 'consent'];\nfor (const field of required) {\n  if (!body[field]) throw new Error(`فیلد ${field} الزامی است`);\n}\n\nif (!body.consent) throw new Error('رضایت الزامی است');\n\nconst validRelationships = ['partner', 'family', 'friend', 'coworker', 'special', 'other'];\nif (!validRelationships.includes(body.relationship)) throw new Error('نوع رابطه نامعتبر است');\n\nconst validGenres = ['romantic', 'emotional', 'happy', 'calm', 'motivational', 'nostalgic'];\nif (!validGenres.includes(body.genre)) throw new Error('ژانر نامعتبر است');\n\nconst jobId = Math.random().toString(16).slice(2, 14);\n\nconst job = {\n  id: jobId,\n  status: 'running',\n  brief: {\n    recipientName: body.recipientName.slice(0, 60),\n    relationship: body.relationship,\n    relationshipOther: body.relationshipOther?.slice(0, 40),\n    occasion: body.occasion,\n    genre: body.genre,\n    aboutText: body.aboutText?.slice(0, 600) || '',\n    photoUrl: body.photoUrl,\n    voiceUrl: body.voiceUrl,\n    consent: true\n  },\n  stages: [\n    { id: 'lyrics',   status: 'pending' },\n    { id: 'music',    status: 'pending' },\n    { id: 'voice',    status: 'pending' },\n    { id: 'video',    status: 'pending' },\n    { id: 'finalize', status: 'pending' }\n  ],\n  progress: 0,\n  result: {},\n  createdAt: Date.now()\n};\n\nreturn [{ json: job }];"
+      },
+      "id": "validate-and-create-job",
+      "name": "اعتبارسنجی و ساخت Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO jobs (id, status, brief, stages, progress, result, created_at) VALUES ('{{ $json.id }}', '{{ $json.status }}', '{{ JSON.stringify($json.brief) }}', '{{ JSON.stringify($json.stages) }}', 0, '{}', {{ $json.createdAt }})",
+        "options": {}
+      },
+      "id": "db-insert-job",
+      "name": "ذخیره Job در SQLite",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [440, 300],
+      "credentials": {
+        "sqlite": {
+          "id": "sqlite-cred",
+          "name": "SQLite - jobs.db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { id: $('اعتبارسنجی و ساخت Job').item.json.id, pollUrl: `/api/jobs/${$('اعتبارسنجی و ساخت Job').item.json.id}` } }}"
+      },
+      "id": "respond-job-created",
+      "name": "پاسخ: Job ایجاد شد",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const brief = $input.first().json.brief;\n\nconst genreMap = { romantic: 'عاشقانه و احساسی', emotional: 'غم‌انگیز و عمیق', happy: 'شاد و پرانرژی', calm: 'آرام و ملایم', motivational: 'انگیزشی و قوی', nostalgic: 'نوستالژیک و خاطره‌انگیز' };\nconst occasionMap = { birthday: 'تولد', anniversary: 'سالگرد', appreciation: 'قدردانی', apology: 'عذرخواهی', celebration: 'جشن', none: 'هدیه‌ای ویژه' };\nconst relationshipMap = { partner: 'همسر/شریک زندگی', family: 'عضو خانواده', friend: 'دوست', coworker: 'همکار', special: 'فرد خاص', other: brief.relationshipOther || 'دیگری' };\n\nconst prompt = `یک ترانه فارسی زیبا و احساسی بنویس با این مشخصات:\\n\\nگیرنده: ${brief.recipientName}\\nرابطه: ${relationshipMap[brief.relationship]}\\nمناسبت: ${occasionMap[brief.occasion]}\\nسبک موسیقی: ${genreMap[brief.genre]}\\n${brief.aboutText ? `اطلاعات بیشتر: ${brief.aboutText}` : ''}\\n\\nقوانین:\\n- ۳ تا ۴ بند داشته باشد، هر بند ۴ سطر\\n- سطرها قافیه داشته باشند\\n- نام ${brief.recipientName} در ترانه ذکر شود\\n- کاملاً فارسی باشد\\n- فقط متن ترانه را بنویس`;\n\nreturn [{ json: { ...($input.first().json), lyricsPrompt: prompt } }];"
+      },
+      "id": "prepare-lyrics-prompt",
+      "name": "آماده‌سازی Prompt اشعار",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "sk-ant-api03-SAMPLE_KEY_REPLACE_ME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-XXXXXXXX" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": { "parameters": [] },
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [{ \"role\": \"user\", \"content\": \"{{ $json.lyricsPrompt }}\" }]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "generate-lyrics-anthropic",
+      "name": "تولید اشعار - Anthropic Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.avalai.ir/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer aa-SAMPLE_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [{ \"role\": \"user\", \"content\": \"{{ $('آماده‌سازی Prompt اشعار').item.json.lyricsPrompt }}\" }]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "generate-lyrics-avalai",
+      "name": "تولید اشعار - AvvalAI (Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "if-lyrics-ok",
+      "name": "اشعار تولید شد؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet lyrics = '';\n\nif (response.content && Array.isArray(response.content)) {\n  lyrics = response.content[0]?.text || '';\n} else if (response.choices) {\n  lyrics = response.choices[0]?.message?.content || '';\n}\n\nif (!lyrics) {\n  const name = $('آماده‌سازی Prompt اشعار').item.json.brief.recipientName;\n  lyrics = `${name} عزیز\\nاین ترانه برای توست\\nبا تمام محبت‌هایم\\nتقدیم به تو می‌کنم\\n\\nهر لحظه با یادت هستم\\nهر قدم با دلم می‌آیم\\nای دوست مهربانم\\nهمیشه در کنارت می‌مانم`;\n}\n\nreturn [{ json: { lyrics, stage: 'lyrics', progress: 20 } }];"
+      },
+      "id": "extract-lyrics",
+      "name": "استخراج متن اشعار",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const brief = $('اعتبارسنجی و ساخت Job').item.json.brief;\n\nconst genreMusicMap = {\n  romantic: 'romantic Persian pop, soft strings, emotional piano, middle eastern flute',\n  emotional: 'melancholic Persian ballad, violin, minor key, slow tempo',\n  happy: 'upbeat Persian pop, bright synths, energetic drums, 120 BPM',\n  calm: 'ambient Persian music, soft oud, gentle rhythm, peaceful',\n  motivational: 'epic orchestral Persian, powerful drums, rising strings, inspiring',\n  nostalgic: 'classic Iranian pop style, acoustic guitar, warm melody, 70s influence'\n};\n\nconst musicPrompt = genreMusicMap[brief.genre] || 'Persian pop music, emotional, melodic';\nconst coverArtPrompt = `Album cover art for Persian song gift, ${brief.genre} style, beautiful calligraphy with name \"${brief.recipientName}\", warm colors, artistic`;\n\nreturn [{ json: { musicPrompt, coverArtPrompt, genre: brief.genre } }];"
+      },
+      "id": "prepare-music-prompt",
+      "name": "آماده‌سازی Prompt موسیقی",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 700]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stability.ai/v2beta/audio/stable-audio/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer sk-SAMPLE_STABILITY_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+            { "name": "Accept", "value": "audio/mpeg" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "prompt", "value": "={{ $json.musicPrompt }}" },
+            { "name": "duration", "value": "120" },
+            { "name": "output_format", "value": "mp3" }
+          ]
+        },
+        "options": { "timeout": 60000, "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "generate-music-stability",
+      "name": "تولید موسیقی - Stable Audio 2.0",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer sk-SAMPLE_STABILITY_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+            { "name": "Accept", "value": "image/jpeg" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "prompt", "value": "={{ $('آماده‌سازی Prompt موسیقی').item.json.coverArtPrompt }}" },
+            { "name": "model", "value": "sd3.5-large" },
+            { "name": "aspect_ratio", "value": "1:1" },
+            { "name": "output_format", "value": "jpeg" }
+          ]
+        },
+        "options": { "timeout": 60000, "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "generate-cover-art",
+      "name": "تولید کاور آرت - Stable Diffusion 3.5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 780]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/voices/add",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "sk_SAMPLE_ELEVENLABS_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "=songai-voice-{{ $('اعتبارسنجی و ساخت Job').item.json.id }}" },
+            { "name": "files", "value": "={{ $('اعتبارسنجی و ساخت Job').item.json.brief.voiceUrl }}" },
+            { "name": "description", "value": "Instant voice clone for song gift" }
+          ]
+        },
+        "options": { "timeout": 60000 }
+      },
+      "id": "clone-voice-elevenlabs",
+      "name": "کلون صدا - ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voice_id }}/stream",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "sk_SAMPLE_ELEVENLABS_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $('استخراج متن اشعار').item.json.lyrics }}\",\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": { \"stability\": 0.3, \"similarity_boost\": 0.9, \"style\": 0.4, \"use_speaker_boost\": true }\n}",
+        "options": { "timeout": 120000, "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "tts-elevenlabs",
+      "name": "Text-to-Speech با صدای کلون‌شده",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 900]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.elevenlabs.io/v1/voices/{{ $('clone-voice-elevenlabs').item.json.voice_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "xi-api-key", "value": "sk_SAMPLE_ELEVENLABS_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "delete-voice",
+      "name": "حذف صدای کلون‌شده (پاکسازی)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.creatify.ai/api/aurora/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-ID", "value": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+            { "name": "X-API-KEY", "value": "SAMPLE_CREATIFY_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"image\": \"{{ $('اعتبارسنجی و ساخت Job').item.json.brief.photoUrl }}\",\n  \"audio\": \"{{ $('Text-to-Speech با صدای کلون‌شده').item.json.fileUrl }}\",\n  \"model_version\": \"aurora_v1_fast\"\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "generate-video-creatify",
+      "name": "تولید ویدیو لیپ‌سینک - Creatify Aurora",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 1100],
+      "notes": "عکس شخص + صدای کلون‌شده → Aurora → ویدیو لیپ‌سینک دقیق"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.creatify.ai/api/aurora/{{ $('generate-video-creatify').item.json.id }}/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-ID", "value": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+            { "name": "X-API-KEY", "value": "SAMPLE_CREATIFY_KEY_REPLACE_ME_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "check-video-status",
+      "name": "بررسی وضعیت ویدیو",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 1100],
+      "notes": "هر ۱۰ ثانیه تا آماده شدن poll می‌کند (max 10 دقیقه)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-video-done",
+      "name": "ویدیو آماده شد؟",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 1100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobId = $('اعتبارسنجی و ساخت Job').item.json.id;\nconst lyrics = $('استخراج متن اشعار').item.json.lyrics;\n\nconst result = {\n  lyrics,\n  audioUrl: `/public/media/${jobId}-audio.mp3`,\n  musicUrl: `/public/media/${jobId}-music.mp3`,\n  coverArtUrl: `/public/media/${jobId}-cover.jpg`,\n  videoUrl: $('بررسی وضعیت ویدیو').item.json.output_video || null\n};\n\nconst stages = [\n  { id: 'lyrics',   status: 'done' },\n  { id: 'music',    status: 'done' },\n  { id: 'voice',    status: 'done' },\n  { id: 'video',    status: result.videoUrl ? 'done' : 'error' },\n  { id: 'finalize', status: 'done' }\n];\n\nreturn [{ json: { id: jobId, status: 'done', stages, progress: 100, result } }];"
+      },
+      "id": "finalize-job",
+      "name": "نهایی‌سازی Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE jobs SET status='done', stages='{{ JSON.stringify($json.stages) }}', progress=100, result='{{ JSON.stringify($json.result) }}' WHERE id='{{ $json.id }}'",
+        "options": {}
+      },
+      "id": "db-update-done",
+      "name": "بروزرسانی Job در DB (Done)",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [1100, 1100],
+      "credentials": {
+        "sqlite": { "id": "sqlite-cred", "name": "SQLite - jobs.db" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM jobs WHERE id='{{ $input.first().json.params.id }}'",
+        "options": {}
+      },
+      "id": "db-get-job",
+      "name": "خواندن Job از DB",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [220, 500],
+      "credentials": {
+        "sqlite": { "id": "sqlite-cred", "name": "SQLite - jobs.db" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nif (!row || !row.id) {\n  $response.statusCode = 404;\n  return [{ json: { error: 'Job یافت نشد' } }];\n}\n\nreturn [{ json: { id: row.id, status: row.status, progress: row.progress, stages: JSON.parse(row.stages || '[]'), result: JSON.parse(row.result || '{}'), error: row.error || null, createdAt: row.created_at } }];"
+      },
+      "id": "format-job-response",
+      "name": "فرمت پاسخ Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-job-status",
+      "name": "پاسخ: وضعیت Job",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"error\": \"{{ $json.message }}\" }",
+        "options": { "responseCode": 400 }
+      },
+      "id": "respond-error",
+      "name": "پاسخ: خطا",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.consent }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "check-consent",
+      "name": "بررسی رضایت‌نامه",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [0, 160]
+    }
+  ],
+  "connections": {
+    "POST /api/jobs": {
+      "main": [[{ "node": "check-consent", "type": "main", "index": 0 }]]
+    },
+    "check-consent": {
+      "main": [
+        [{ "node": "اعتبارسنجی و ساخت Job", "type": "main", "index": 0 }],
+        [{ "node": "پاسخ: خطا", "type": "main", "index": 0 }]
+      ]
+    },
+    "اعتبارسنجی و ساخت Job": {
+      "main": [[{ "node": "ذخیره Job در SQLite", "type": "main", "index": 0 }]]
+    },
+    "ذخیره Job در SQLite": {
+      "main": [[
+        { "node": "پاسخ: Job ایجاد شد", "type": "main", "index": 0 },
+        { "node": "آماده‌سازی Prompt اشعار", "type": "main", "index": 0 }
+      ]]
+    },
+    "آماده‌سازی Prompt اشعار": {
+      "main": [[{ "node": "تولید اشعار - Anthropic Claude", "type": "main", "index": 0 }]]
+    },
+    "تولید اشعار - Anthropic Claude": {
+      "main": [[{ "node": "اشعار تولید شد؟", "type": "main", "index": 0 }]]
+    },
+    "اشعار تولید شد؟": {
+      "main": [
+        [{ "node": "استخراج متن اشعار", "type": "main", "index": 0 }],
+        [{ "node": "تولید اشعار - AvvalAI (Fallback)", "type": "main", "index": 0 }]
+      ]
+    },
+    "تولید اشعار - AvvalAI (Fallback)": {
+      "main": [[{ "node": "استخراج متن اشعار", "type": "main", "index": 0 }]]
+    },
+    "استخراج متن اشعار": {
+      "main": [[{ "node": "آماده‌سازی Prompt موسیقی", "type": "main", "index": 0 }]]
+    },
+    "آماده‌سازی Prompt موسیقی": {
+      "main": [[
+        { "node": "تولید موسیقی - Stable Audio 2.0", "type": "main", "index": 0 },
+        { "node": "تولید کاور آرت - Stable Diffusion 3.5", "type": "main", "index": 0 }
+      ]]
+    },
+    "تولید موسیقی - Stable Audio 2.0": {
+      "main": [[{ "node": "کلون صدا - ElevenLabs", "type": "main", "index": 0 }]]
+    },
+    "کلون صدا - ElevenLabs": {
+      "main": [[{ "node": "Text-to-Speech با صدای کلون‌شده", "type": "main", "index": 0 }]]
+    },
+    "Text-to-Speech با صدای کلون‌شده": {
+      "main": [[{ "node": "حذف صدای کلون‌شده (پاکسازی)", "type": "main", "index": 0 }]]
+    },
+    "حذف صدای کلون‌شده (پاکسازی)": {
+      "main": [[{ "node": "تولید ویدیو لیپ‌سینک - Creatify Aurora", "type": "main", "index": 0 }]]
+    },
+    "تولید ویدیو لیپ‌سینک - Creatify Aurora": {
+      "main": [[{ "node": "بررسی وضعیت ویدیو", "type": "main", "index": 0 }]]
+    },
+    "بررسی وضعیت ویدیو": {
+      "main": [[{ "node": "ویدیو آماده شد؟", "type": "main", "index": 0 }]]
+    },
+    "ویدیو آماده شد؟": {
+      "main": [
+        [{ "node": "نهایی‌سازی Job", "type": "main", "index": 0 }],
+        [{ "node": "بررسی وضعیت ویدیو", "type": "main", "index": 0 }]
+      ]
+    },
+    "نهایی‌سازی Job": {
+      "main": [[{ "node": "بروزرسانی Job در DB (Done)", "type": "main", "index": 0 }]]
+    },
+    "GET /api/jobs/:id": {
+      "main": [[{ "node": "خواندن Job از DB", "type": "main", "index": 0 }]]
+    },
+    "خواندن Job از DB": {
+      "main": [[{ "node": "فرمت پاسخ Job", "type": "main", "index": 0 }]]
+    },
+    "فرمت پاسخ Job": {
+      "main": [[{ "node": "پاسخ: وضعیت Job", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {
+    "POST /api/jobs": [
+      {
+        "json": {
+          "body": {
+            "recipientName": "سارا محمدی",
+            "relationship": "friend",
+            "occasion": "birthday",
+            "genre": "happy",
+            "aboutText": "سارا دوست صمیمی منه، همیشه خوش‌روحیه و شاد، عاشق موسیقی پاپ ایرانیه",
+            "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400",
+            "voiceUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+            "consent": true
+          },
+          "headers": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "",
+    "timezone": "Asia/Tehran"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "songai-workflow-sample"
+  },
+  "tags": ["SongAI", "Sample", "موسیقی"],
+  "versionId": "1.0.0",
+  "notes": "## نسخه نمونه با داده‌های تستی\n\n⚠️ کلیدهای API در این فایل SAMPLE هستند — قبل از استفاده واقعی جایگزین کنید:\n\n| متغیر | مقدار فعلی | جایگزینی |\n|-------|-----------|----------|\n| Anthropic API Key | sk-ant-api03-SAMPLE... | کلید واقعی از console.anthropic.com |\n| AvvalAI API Key | aa-SAMPLE... | کلید واقعی از avalai.ir |\n| ElevenLabs API Key | sk_SAMPLE... | کلید واقعی از elevenlabs.io |\n| Stability API Key | sk-SAMPLE... | کلید واقعی از platform.stability.ai |\n| Creatify API ID | xxxxxxxx-xxxx... | ID واقعی از creatify.ai |\n| Creatify API Key | SAMPLE_CREATIFY... | کلید واقعی از creatify.ai |\n\n### داده تستی آماده (pinData):\nوقتی روی نود «POST /api/jobs» کلیک کنید و Test کنید، این داده به صورت خودکار استفاده می‌شه:\n- گیرنده: سارا محمدی\n- رابطه: دوست\n- مناسبت: تولد\n- ژانر: شاد"
+}

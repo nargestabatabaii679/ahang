@@ -286,14 +286,31 @@ export function ResultView({ recipientName, result, jobId, onRestart }: ResultVi
                 </p>
               )}
               {musicUrl && localMusicError && (
-                <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
-                  🎵 {localMusicError}
-                </p>
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
+                    خطا در بارگذاری موسیقی
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalMusicError(null);
+                      if (musicRef.current) {
+                        musicRef.current.load();
+                      }
+                    }}
+                    className="tap self-start inline-flex items-center gap-1.5 border border-[var(--color-primary)]/40 px-2.5 py-1 text-[11px] font-black text-[var(--color-foreground)] transition hover:border-[var(--color-accent)]"
+                  >
+                    <ArrowCounterClockwise className="h-3 w-3" />
+                    تلاش مجدد
+                  </button>
+                </div>
               )}
-              {!musicUrl && musicError && (
+              {!musicUrl && (
                 <p className="text-[11px] leading-5 text-[var(--color-muted-foreground)]">
-                  🎵 موسیقی پس‌زمینه ساخته نشد؛ فقط صدا پخش می‌شود.
-                  <span className="block opacity-60 mt-1 break-all">{musicError}</span>
+                  موسیقی پس‌زمینه ساخته نشد
+                  {musicError && (
+                    <span className="block opacity-60 mt-1 break-all">{musicError}</span>
+                  )}
                 </p>
               )}
             </div>

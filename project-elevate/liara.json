@@ -1,9 +1,5 @@
 {
   "platform": "docker",
   "port": 3000,
-  "app": "songai",
-  "disks": [
-    { "name": "songai-data", "mountTo": "/app/data" },
-    { "name": "songai-media", "mountTo": "/app/public/media" }
-  ]
+  "app": "songai"
 }

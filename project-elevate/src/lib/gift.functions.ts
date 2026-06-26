@@ -8,6 +8,7 @@ export const getGiftJob = createServerFn({ method: "GET" })
     const job = await getJob(data.id);
     if (!job || job.status !== "done" || !job.result) return null;
     return {
+      id: job.id,
       recipientName: job.brief.recipientName,
       videoUrl: job.result.videoUrl,
       audioUrl: job.result.audioUrl,

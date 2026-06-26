@@ -18,5 +18,13 @@ export default defineConfig({
     preset: "node-server",
     // Ensure the server listens on all interfaces in production (required by Liara/Docker)
     devServer: { host: "0.0.0.0" },
+    // Cache-Control headers for immutable media assets (audio, video, images)
+    routeRules: {
+      "/media/**": {
+        headers: {
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      },
+    },
   },
 });
