@@ -290,7 +290,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.creatify.ai/api/lipsync/",
+        "url": "https://api.creatify.ai/api/aurora/",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -301,19 +301,20 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"video_url\": \"{{ $('اعتبارسنجی و ساخت Job').item.json.brief.photoUrl }}\",\n  \"audio_url\": \"{{ $('tts-elevenlabs').item.json.fileUrl }}\",\n  \"aspect_ratio\": \"9:16\"\n}",
+        "jsonBody": "={\n  \"image\": \"{{ $('اعتبارسنجی و ساخت Job').item.json.brief.photoUrl }}\",\n  \"audio\": \"{{ $('Text-to-Speech با صدای کلون‌شده').item.json.fileUrl }}\",\n  \"model_version\": \"aurora_v1_fast\"\n}",
         "options": { "timeout": 30000 }
       },
       "id": "generate-video-creatify",
       "name": "تولید ویدیو لیپ‌سینک - Creatify Aurora",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 1100]
+      "position": [220, 1100],
+      "notes": "عکس شخص + صدای کلون‌شده → Aurora → ویدیو لیپ‌سینک دقیق"
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.creatify.ai/api/lipsync/{{ $('generate-video-creatify').item.json.id }}/",
+        "url": "=https://api.creatify.ai/api/aurora/{{ $('generate-video-creatify').item.json.id }}/",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -327,7 +328,8 @@
       "name": "بررسی وضعیت ویدیو",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 1100]
+      "position": [440, 1100],
+      "notes": "هر ۱۰ ثانیه تا آماده شدن poll می‌کند (max 10 دقیقه)"
     },
     {
       "parameters": {
