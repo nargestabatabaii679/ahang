@@ -1,3 +1,4 @@
+
 {
   "name": "SongAI - تولید هدیه موسیقی شخصی‌سازی‌شده",
   "nodes": [
@@ -12,7 +13,10 @@
       "name": "POST /api/jobs",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "songai-create-job",
       "notes": "دریافت اطلاعات کاربر: recipientName, relationship, occasion, genre, aboutText, photoUrl, voiceUrl, consent"
     },
@@ -27,7 +31,10 @@
       "name": "GET /api/jobs/:id",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 500],
+      "position": [
+        0,
+        500
+      ],
       "webhookId": "songai-poll-job"
     },
     {
@@ -38,7 +45,10 @@
       "name": "اعتبارسنجی و ساخت Job",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -50,7 +60,10 @@
       "name": "ذخیره Job در SQLite",
       "type": "n8n-nodes-base.sqlite",
       "typeVersion": 1,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "credentials": {
         "sqlite": {
           "id": "sqlite-cred",
@@ -61,23 +74,29 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { id: $('اعتبارسنجی و ساخت Job').item.json.id } }}"
+        "responseBody": "={{ { id: $('اعتبارسنجی و ساخت Job').item.json.id, pollUrl: `/api/jobs/${$('اعتبارسنجی و ساخت Job').item.json.id}` } }}"
       },
       "id": "respond-job-created",
       "name": "پاسخ: Job ایجاد شد",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// ساخت prompt فارسی برای تولید اشعار\nconst brief = $input.first().json.brief;\n\nconst genreMap = {\n  romantic: 'عاشقانه و احساسی',\n  emotional: 'غم‌انگیز و عمیق',\n  happy: 'شاد و پرانرژی',\n  calm: 'آرام و ملایم',\n  motivational: 'انگیزشی و قوی',\n  nostalgic: 'نوستالژیک و خاطره‌انگیز'\n};\n\nconst occasionMap = {\n  birthday: 'تولد',\n  anniversary: 'سالگرد',\n  appreciation: 'قدردانی',\n  apology: 'عذرخواهی',\n  celebration: 'جشن',\n  none: 'هدیه‌ای ویژه'\n};\n\nconst relationshipMap = {\n  partner: 'همسر/شریک زندگی',\n  family: 'عضو خانواده',\n  friend: 'دوست',\n  coworker: 'همکار',\n  special: 'فرد خاص',\n  other: brief.relationshipOther || 'دیگری'\n};\n\nconst prompt = `یک ترانه فارسی زیبا و احساسی بنویس با این مشخصات:\n\nگیرنده: ${brief.recipientName}\nرابطه: ${relationshipMap[brief.relationship]}\nمناسبت: ${occasionMap[brief.occasion]}\nسبک موسیقی: ${genreMap[brief.genre]}\n${brief.aboutText ? `اطلاعات بیشتر: ${brief.aboutText}` : ''}\n\nقوانین:\n- ۳ تا ۴ بند داشته باشد، هر بند ۴ سطر\n- سطرها قافیه داشته باشند\n- نام ${brief.recipientName} در ترانه ذکر شود\n- کاملاً فارسی باشد\n- احساسی و صمیمی باشد\n- فقط متن ترانه را بنویس، بدون توضیح اضافه`;\n\nreturn [{ json: { ...($input.first().json), lyricsPrompt: prompt } }];"
+        "jsCode": "// ساخت prompt فارسی برای تولید اشعار\nconst brief = $input.first().json.brief;\n\nconst genreMap = {\n  romantic: 'عاشقانه و احساسی',\n  emotional: 'غم‌انگیز و عمیق',\n  happy: 'شاد و پرانرژی',\n  calm: 'آرام و ملایم',\n  motivational: 'انگیزشی و قوی',\n  nostalgic: 'نوستالژیک و خاطره‌انگیز'\n};\n\nconst occasionMap = {\n  birthday: 'تولد',\n  anniversary: 'سالگرد',\n  appreciation: 'قدردانی',\n  apology: 'عذرخواهی',\n  celebration: 'جشن',\n  none: 'هدیه‌ای ویژه'\n};\n\nconst relationshipMap = {\n  partner: 'همسر/شریک زندگی',\n  family: 'عضو خانواده',\n  friend: 'دوست',\n  coworker: 'همکار',\n  special: 'فرد خاص',\n  other: brief.relationshipOther || 'دیگری'\n};\n\nconst prompt = `یک ترانه فارسی زیبا و احساسی بنویس با این مشخصات:\\n\\nگیرنده: ${brief.recipientName}\\nرابطه: ${relationshipMap[brief.relationship]}\\nمناسبت: ${occasionMap[brief.occasion]}\\nسبک موسیقی: ${genreMap[brief.genre]}\\n${brief.aboutText ? `اطلاعات بیشتر: ${brief.aboutText}` : ''}\\n\\nقوانین:\\n- ۳ تا ۴ بند داشته باشد، هر بند ۴ سطر\\n- سطرها قافیه داشته باشند\\n- نام ${brief.recipientName} در ترانه ذکر شود\\n- کاملاً فارسی باشد\\n- احساسی و صمیمی باشد\\n- فقط متن ترانه را بنویس، بدون توضیح اضافه`;\n\nreturn [{ json: { ...($input.first().json), lyricsPrompt: prompt } }];"
       },
       "id": "prepare-lyrics-prompt",
       "name": "آماده‌سازی Prompt اشعار",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 500]
+      "position": [
+        220,
+        500
+      ]
     },
     {
       "parameters": {
@@ -86,9 +105,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $vars.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "x-api-key",
+              "value": "={{ $vars.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -105,7 +133,10 @@
       "name": "تولید اشعار - Anthropic Claude",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 420]
+      "position": [
+        440,
+        420
+      ]
     },
     {
       "parameters": {
@@ -114,8 +145,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.AVALAI_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.AVALAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -129,17 +166,25 @@
       "name": "تولید اشعار - AvvalAI (Fallback)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 560]
+      "position": [
+        440,
+        560
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false },
+          "options": {
+            "caseSensitive": false
+          },
           "conditions": [
             {
               "leftValue": "={{ $json.content }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
             }
           ]
         }
@@ -148,7 +193,10 @@
       "name": "اشعار تولید شد؟",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [660, 500]
+      "position": [
+        660,
+        500
+      ]
     },
     {
       "parameters": {
@@ -158,7 +206,10 @@
       "name": "استخراج متن اشعار",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 500]
+      "position": [
+        880,
+        500
+      ]
     },
     {
       "parameters": {
@@ -168,7 +219,10 @@
       "name": "آماده‌سازی Prompt موسیقی",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 700]
+      "position": [
+        220,
+        700
+      ]
     },
     {
       "parameters": {
@@ -177,29 +231,51 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.STABILITY_API_KEY }}" },
-            { "name": "Accept", "value": "audio/mpeg" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.STABILITY_API_KEY }}"
+            },
+            {
+              "name": "Accept",
+              "value": "audio/mpeg"
+            }
           ]
         },
         "sendBody": true,
         "contentType": "form-data",
         "bodyParameters": {
           "parameters": [
-            { "name": "prompt", "value": "={{ $json.musicPrompt }}" },
-            { "name": "duration", "value": "120" },
-            { "name": "output_format", "value": "mp3" }
+            {
+              "name": "prompt",
+              "value": "={{ $json.musicPrompt }}"
+            },
+            {
+              "name": "duration",
+              "value": "120"
+            },
+            {
+              "name": "output_format",
+              "value": "mp3"
+            }
           ]
         },
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "file" } }
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "id": "generate-music-stability",
       "name": "تولید موسیقی - Stable Audio 2.0",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 640]
+      "position": [
+        440,
+        640
+      ]
     },
     {
       "parameters": {
@@ -208,30 +284,55 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $vars.STABILITY_API_KEY }}" },
-            { "name": "Accept", "value": "image/jpeg" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.STABILITY_API_KEY }}"
+            },
+            {
+              "name": "Accept",
+              "value": "image/jpeg"
+            }
           ]
         },
         "sendBody": true,
         "contentType": "form-data",
         "bodyParameters": {
           "parameters": [
-            { "name": "prompt", "value": "={{ $('آماده‌سازی Prompt موسیقی').item.json.coverArtPrompt }}" },
-            { "name": "model", "value": "sd3.5-large" },
-            { "name": "aspect_ratio", "value": "1:1" },
-            { "name": "output_format", "value": "jpeg" }
+            {
+              "name": "prompt",
+              "value": "={{ $('آماده‌سازی Prompt موسیقی').item.json.coverArtPrompt }}"
+            },
+            {
+              "name": "model",
+              "value": "sd3.5-large"
+            },
+            {
+              "name": "aspect_ratio",
+              "value": "1:1"
+            },
+            {
+              "name": "output_format",
+              "value": "jpeg"
+            }
           ]
         },
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "file" } }
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "id": "generate-cover-art",
       "name": "تولید کاور آرت - Stable Diffusion 3.5",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 780]
+      "position": [
+        440,
+        780
+      ]
     },
     {
       "parameters": {
@@ -240,25 +341,42 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "xi-api-key", "value": "={{ $vars.ELEVENLABS_API_KEY }}" }
+            {
+              "name": "xi-api-key",
+              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
+            }
           ]
         },
         "sendBody": true,
         "contentType": "form-data",
         "bodyParameters": {
           "parameters": [
-            { "name": "name", "value": "=songai-voice-{{ $('اعتبارسنجی و ساخت Job').item.json.id }}" },
-            { "name": "files", "value": "={{ $('اعتبارسنجی و ساخت Job').item.json.brief.voiceUrl }}" },
-            { "name": "description", "value": "Instant voice clone for song gift" }
+            {
+              "name": "name",
+              "value": "=songai-voice-{{ $('اعتبارسنجی و ساخت Job').item.json.id }}"
+            },
+            {
+              "name": "files",
+              "value": "={{ $('اعتبارسنجی و ساخت Job').item.json.brief.voiceUrl }}"
+            },
+            {
+              "name": "description",
+              "value": "Instant voice clone for song gift"
+            }
           ]
         },
-        "options": { "timeout": 60000 }
+        "options": {
+          "timeout": 60000
+        }
       },
       "id": "clone-voice-elevenlabs",
       "name": "کلون صدا - ElevenLabs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 900]
+      "position": [
+        220,
+        900
+      ]
     },
     {
       "parameters": {
@@ -267,8 +385,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "xi-api-key", "value": "={{ $vars.ELEVENLABS_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "xi-api-key",
+              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -276,14 +400,21 @@
         "jsonBody": "={\n  \"text\": \"{{ $('استخراج متن اشعار').item.json.lyrics }}\",\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.3,\n    \"similarity_boost\": 0.9,\n    \"style\": 0.4,\n    \"use_speaker_boost\": true\n  }\n}",
         "options": {
           "timeout": 120000,
-          "response": { "response": { "responseFormat": "file" } }
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "id": "tts-elevenlabs",
       "name": "Text-to-Speech با صدای کلون‌شده",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 900]
+      "position": [
+        440,
+        900
+      ]
     },
     {
       "parameters": {
@@ -292,7 +423,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "xi-api-key", "value": "={{ $vars.ELEVENLABS_API_KEY }}" }
+            {
+              "name": "xi-api-key",
+              "value": "={{ $vars.ELEVENLABS_API_KEY }}"
+            }
           ]
         },
         "options": {}
@@ -301,7 +435,10 @@
       "name": "حذف صدای کلون‌شده (پاکسازی)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 900]
+      "position": [
+        660,
+        900
+      ]
     },
     {
       "parameters": {
@@ -310,33 +447,55 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-API-ID", "value": "={{ $vars.CREATIFY_API_ID }}" },
-            { "name": "X-API-KEY", "value": "={{ $vars.CREATIFY_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "X-API-ID",
+              "value": "={{ $vars.CREATIFY_API_ID }}"
+            },
+            {
+              "name": "X-API-KEY",
+              "value": "={{ $vars.CREATIFY_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"video_url\": \"{{ $('اعتبارسنجی و ساخت Job').item.json.brief.photoUrl }}\",\n  \"audio_url\": \"{{ $('tts-elevenlabs').item.json.fileUrl }}\",\n  \"aspect_ratio\": \"9:16\"\n}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "generate-video-creatify",
       "name": "تولید ویدیو لیپ‌سینک - Creatify Aurora",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 1100]
+      "position": [
+        220,
+        1100
+      ]
     },
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "seconds", "secondsInterval": 10 }]
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
         }
       },
       "id": "poll-video-trigger",
       "name": "Poll هر ۱۰ ثانیه",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [440, 1100]
+      "position": [
+        440,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -345,17 +504,28 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-API-ID", "value": "={{ $vars.CREATIFY_API_ID }}" },
-            { "name": "X-API-KEY", "value": "={{ $vars.CREATIFY_API_KEY }}" }
+            {
+              "name": "X-API-ID",
+              "value": "={{ $vars.CREATIFY_API_ID }}"
+            },
+            {
+              "name": "X-API-KEY",
+              "value": "={{ $vars.CREATIFY_API_KEY }}"
+            }
           ]
         },
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "check-video-status",
       "name": "بررسی وضعیت ویدیو",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 1100]
+      "position": [
+        660,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -364,7 +534,10 @@
             {
               "leftValue": "={{ $json.status }}",
               "rightValue": "done",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -373,7 +546,10 @@
       "name": "ویدیو آماده شد؟",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 1100]
+      "position": [
+        880,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -383,7 +559,10 @@
       "name": "نهایی‌سازی Job",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 1100]
+      "position": [
+        1100,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -395,7 +574,10 @@
       "name": "بروزرسانی Job در DB (Done)",
       "type": "n8n-nodes-base.sqlite",
       "typeVersion": 1,
-      "position": [1320, 1100],
+      "position": [
+        1320,
+        1100
+      ],
       "credentials": {
         "sqlite": {
           "id": "sqlite-cred",
@@ -413,7 +595,10 @@
       "name": "خواندن Job از DB",
       "type": "n8n-nodes-base.sqlite",
       "typeVersion": 1,
-      "position": [220, 500],
+      "position": [
+        220,
+        500
+      ],
       "credentials": {
         "sqlite": {
           "id": "sqlite-cred",
@@ -429,7 +614,10 @@
       "name": "فرمت پاسخ Job",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 500]
+      "position": [
+        440,
+        500
+      ]
     },
     {
       "parameters": {
@@ -440,7 +628,10 @@
       "name": "پاسخ: وضعیت Job",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [660, 500]
+      "position": [
+        660,
+        500
+      ]
     },
     {
       "parameters": {
@@ -452,7 +643,10 @@
       "name": "بروزرسانی پیشرفت در DB",
       "type": "n8n-nodes-base.sqlite",
       "typeVersion": 1,
-      "position": [660, 300],
+      "position": [
+        660,
+        300
+      ],
       "credentials": {
         "sqlite": {
           "id": "sqlite-cred",
@@ -470,7 +664,10 @@
       "name": "ذخیره خطا در DB",
       "type": "n8n-nodes-base.sqlite",
       "typeVersion": 1,
-      "position": [1100, 700],
+      "position": [
+        1100,
+        700
+      ],
       "credentials": {
         "sqlite": {
           "id": "sqlite-cred",
@@ -482,13 +679,18 @@
       "parameters": {
         "respondWith": "json",
         "responseBody": "={ \"error\": \"{{ $json.message }}\" }",
-        "options": { "responseCode": 400 }
+        "options": {
+          "responseCode": 400
+        }
       },
       "id": "respond-error",
       "name": "پاسخ: خطا",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [440, 160]
+      "position": [
+        440,
+        160
+      ]
     },
     {
       "parameters": {
@@ -497,7 +699,10 @@
             {
               "leftValue": "={{ $json.body.consent }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
           ]
         }
@@ -506,87 +711,274 @@
       "name": "بررسی رضایت‌نامه",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [0, 160]
+      "position": [
+        0,
+        160
+      ]
     }
   ],
   "connections": {
     "POST /api/jobs": {
-      "main": [[{ "node": "check-consent", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "check-consent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "check-consent": {
       "main": [
-        [{ "node": "اعتبارسنجی و ساخت Job", "type": "main", "index": 0 }],
-        [{ "node": "respond-error", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "اعتبارسنجی و ساخت Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "پاسخ: خطا",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "اعتبارسنجی و ساخت Job": {
-      "main": [[{ "node": "ذخیره Job در SQLite", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "ذخیره Job در SQLite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "ذخیره Job در SQLite": {
-      "main": [[
-        { "node": "پاسخ: Job ایجاد شد", "type": "main", "index": 0 },
-        { "node": "آماده‌سازی Prompt اشعار", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "پاسخ: Job ایجاد شد",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "آماده‌سازی Prompt اشعار",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "آماده‌سازی Prompt اشعار": {
-      "main": [[{ "node": "تولید اشعار - Anthropic Claude", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "تولید اشعار - Anthropic Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "تولید اشعار - Anthropic Claude": {
-      "main": [[{ "node": "اشعار تولید شد؟", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "اشعار تولید شد؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "اشعار تولید شد؟": {
       "main": [
-        [{ "node": "استخراج متن اشعار", "type": "main", "index": 0 }],
-        [{ "node": "تولید اشعار - AvvalAI (Fallback)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "استخراج متن اشعار",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "تولید اشعار - AvvalAI (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "تولید اشعار - AvvalAI (Fallback)": {
-      "main": [[{ "node": "استخراج متن اشعار", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "استخراج متن اشعار",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "استخراج متن اشعار": {
-      "main": [[{ "node": "آماده‌سازی Prompt موسیقی", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "آماده‌سازی Prompt موسیقی",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "آماده‌سازی Prompt موسیقی": {
-      "main": [[
-        { "node": "تولید موسیقی - Stable Audio 2.0", "type": "main", "index": 0 },
-        { "node": "تولید کاور آرت - Stable Diffusion 3.5", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "تولید موسیقی - Stable Audio 2.0",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "تولید کاور آرت - Stable Diffusion 3.5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "تولید موسیقی - Stable Audio 2.0": {
-      "main": [[{ "node": "کلون صدا - ElevenLabs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "کلون صدا - ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "کلون صدا - ElevenLabs": {
-      "main": [[{ "node": "Text-to-Speech با صدای کلون‌شده", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Text-to-Speech با صدای کلون‌شده",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Text-to-Speech با صدای کلون‌شده": {
-      "main": [[{ "node": "حذف صدای کلون‌شده (پاکسازی)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "حذف صدای کلون‌شده (پاکسازی)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "حذف صدای کلون‌شده (پاکسازی)": {
-      "main": [[{ "node": "تولید ویدیو لیپ‌سینک - Creatify Aurora", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "تولید ویدیو لیپ‌سینک - Creatify Aurora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "تولید ویدیو لیپ‌سینک - Creatify Aurora": {
-      "main": [[{ "node": "بررسی وضعیت ویدیو", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "بررسی وضعیت ویدیو",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "بررسی وضعیت ویدیو": {
-      "main": [[{ "node": "ویدیو آماده شد؟", "type": "main", "index": 0 }]]
-    },
-    "ویدیو آماده شد؟": {
       "main": [
-        [{ "node": "نهایی‌سازی Job", "type": "main", "index": 0 }],
-        [{ "node": "بررسی وضعیت ویدیو", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "ویڈیو آماده شد؟",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ویڈیو آماده شد؟": {
+      "main": [
+        [
+          {
+            "node": "نهایی‌سازی Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "بررسی وضعیت ویدیو",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "نهایی‌سازی Job": {
-      "main": [[{ "node": "بروزرسانی Job در DB (Done)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "بروزرسانی Job در DB (Done)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GET /api/jobs/:id": {
-      "main": [[{ "node": "خواندن Job از DB", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "خواندن Job از DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "خواندن Job از DB": {
-      "main": [[{ "node": "فرمت پاسخ Job", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "فرمت پاسخ Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "فرمت پاسخ Job": {
-      "main": [[{ "node": "پاسخ: وضعیت Job", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "پاسخ: وضعیت Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -599,8 +991,14 @@
     "templateCredsSetupCompleted": false,
     "instanceId": "songai-workflow"
   },
-  "tags": ["SongAI", "موسیقی", "هوش مصنوعی"],
+  "tags": [
+    "SongAI",
+    "موسیقی",
+    "هوش مصنوعی"
+  ],
   "pinData": {},
   "versionId": "1.0.0",
-  "notes": "## SongAI - Workflow n8n\n\n### متغیرهای محیطی مورد نیاز (در Settings > Variables):\n- `ANTHROPIC_API_KEY` - برای تولید اشعار\n- `AVALAI_API_KEY` + `AVALAI_API_BASE` - جایگزین Anthropic\n- `ELEVENLABS_API_KEY` - کلون صدا\n- `STABILITY_API_KEY` - موسیقی و کاور آرت\n- `CREATIFY_API_ID` + `CREATIFY_API_KEY` - ویدیو لیپ‌سینک\n\n### مراحل pipeline:\n1. lyrics (20%) - تولید اشعار فارسی\n2. music (20%) - موسیقی پس‌زمینه + کاور آرت\n3. voice (35%) - کلون صدا + Text-to-Speech\n4. video (20%) - ویدیو لیپ‌سینک\n5. finalize (5%) - تکمیل\n\n### نصب:\n1. این فایل را در n8n import کنید\n2. Credential SQLite بسازید و به jobs.db متصل کنید\n3. متغیرهای محیطی را در Settings > Variables وارد کنید\n4. Webhook URL را در app تنظیم کنید"
+  "notes": "## SongAI - Workflow n8n\n\n### متغیرهای محیطی مورد نیاز (در Settings > Variables):\n- `ANTHROPIC_API_KEY` - برای تولید اشعار\n- `CLAUDE_API_KEY` - در صورت استفاده از کلید جداگانه برای Claude\n- `AVALAI_API_KEY` + `AVALAI_API_BASE` - جایگزین Anthropic یا fallback\n- `ELEVENLABS_API_KEY` - کلون صدا و TTS\n- `OPENROUTER_API_KEY` - در صورت استفاده از openrouter\n- `GITHUB_TOKEN` - برای دسترسی به repoها (اختیاری)\n- `STABILITY_API_KEY` - موسیقی و کاور آرت\n- `CREATIFY_API_ID` + `CREATIFY_API_KEY` - ویدیو لیپ‌سینک\n\n### مراحل pipeline:\n1. lyrics (20%) - تولید اشعار فارسی\n2. music (20%) - موسیقی پس‌زمینه + کاور آرت\n3. voice (35%) - کلون صدا + Text-to-Speech\n4. video (20%) - ویدیو لیپ‌سینک\n5. finalize (5%) - تکمیل\n\n### نصب:\n1. این فایل را در n8n import کنید\n2. Credential SQLite بسازید و به jobs.db متصل کنید\n3. متغیرهای محیطی را در Settings > Variables وارد کنید (مقادیر کلیدها را در اینجا قرار دهید)\n4. Webhook URL را در app تنظیم کنید\n\n### نکتهٔ امنیتی:\n- از وارد کردن کلیدها مستقیم در فایل JSON خودداری کنید؛ فقط آن‌ها را در Settings > Variables قرار دهید.\n- اگر کلیدها قبلاً افشا شده‌اند، فوراً آن‌ها را rotate/revoke کنید.",
+  "pinData2": {},
+  "pinData3": {}
 }
