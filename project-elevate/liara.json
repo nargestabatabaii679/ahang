@@ -1,13 +1,5 @@
 {
-  "platform": "node",
+  "platform": "docker",
   "port": 3000,
-  "app": "songai",
-  "node": {
-    "version": 22
-  },
-  "start": "node .output/server/index.mjs",
-  "disks": [
-    { "name": "songai-data", "mountTo": "/app/data" },
-    { "name": "songai-media", "mountTo": "/app/public/media" }
-  ]
+  "app": "songai"
 }
