@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "NITRO_PRESET=node-server vite dev",
-    "build": "NITRO_PRESET=node-server vite build",
+    "build": "NITRO_PRESET=node-server vite build && python3 scripts/patch-renderer.py",
     "build:dev": "NITRO_PRESET=node-server vite build --mode development",
     "start": "NITRO_HOST=0.0.0.0 NITRO_PORT=3000 node .output/server/index.mjs",
     "preview": "vite preview",
