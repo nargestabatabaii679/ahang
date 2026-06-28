@@ -7,11 +7,8 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
-// In production Docker (/app), use absolute path. In dev, relative to cwd.
-const MEDIA_DIR =
-  process.env.NODE_ENV === "production"
-    ? "/app/public/media"
-    : join(process.cwd(), "public", "media");
+// Support DATA_DIR env var for Liara disk mounts; fallback to cwd-relative
+const MEDIA_DIR = process.env.MEDIA_DIR ?? join(process.cwd(), "public", "media");
 const MEDIA_URL_PREFIX = "/media";
 
 mkdirSync(MEDIA_DIR, { recursive: true });
