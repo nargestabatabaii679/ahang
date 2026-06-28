@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM registry.liara.ir/library/node:22-bookworm-slim
 WORKDIR /app
 
 COPY .output ./.output
