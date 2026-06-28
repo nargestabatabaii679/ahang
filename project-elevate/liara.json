@@ -1,5 +1,9 @@
 {
-  "platform": "docker",
+  "platform": "node",
   "port": 3000,
-  "app": "songai"
+  "app": "songai",
+  "node": {
+    "version": 22
+  },
+  "start": "node .output/server/index.mjs"
 }
