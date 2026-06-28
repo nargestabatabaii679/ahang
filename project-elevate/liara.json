@@ -5,5 +5,5 @@
   "node": {
     "version": 22
   },
-  "start": "node .output/server/index.mjs"
+  "start": "HOST=0.0.0.0 PORT=3000 NITRO_HOST=0.0.0.0 NITRO_PORT=3000 NODE_ENV=production node .output/server/index.mjs"
 }
