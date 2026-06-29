@@ -26,7 +26,7 @@ else:
     open(path, 'w').write(patched)
     print("patched renderer-template: " + js + " + " + css)
 
-# 2. Patch index.mjs — wire SSR service to handle ALL routes (including /api/*)
+# 2. Patch index.mjs — wire SSR + dynamic media handler
 index_path = ".output/server/index.mjs"
 idx = open(index_path).read()
 
@@ -35,10 +35,36 @@ if "ssrHandler" in idx:
 else:
     old_handler = 'var _lazy_l4O20E = defineLazyEventHandler(() => import("./_chunks/renderer-template.mjs"));'
     new_handler = (
+        '// Dynamic media file server for runtime-generated files\n'
+        'import { createReadStream, statSync } from "node:fs";\n'
+        'import { join as pathJoin, extname } from "node:path";\n'
+        'var RUNTIME_MEDIA_DIR = process.env.MEDIA_DIR || pathJoin(process.cwd(), "public", "media");\n'
+        'var MIME = { ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",\n'
+        '  ".gif":"image/gif",".mp3":"audio/mpeg",".wav":"audio/wav",".ogg":"audio/ogg",\n'
+        '  ".webm":"audio/webm",".m4a":"audio/mp4",".mp4":"video/mp4",".flac":"audio/flac",\n'
+        '  ".aac":"audio/aac" };\n'
+        'var mediaHandler = defineHandler((event) => {\n'
+        '  var filename = event.url.pathname.replace(/^\\/media\\//, "");\n'
+        '  if (!filename || filename.includes("..")) return new NodeResponse(null, { status: 404 });\n'
+        '  var filePath = pathJoin(RUNTIME_MEDIA_DIR, filename);\n'
+        '  try {\n'
+        '    var stat = statSync(filePath);\n'
+        '    var ct = MIME[extname(filename).toLowerCase()] || "application/octet-stream";\n'
+        '    var stream = createReadStream(filePath);\n'
+        '    return new NodeResponse(stream, {\n'
+        '      status: 200,\n'
+        '      headers: { "content-type": ct, "content-length": String(stat.size),\n'
+        '        "cache-control": "public, max-age=31536000, immutable" }\n'
+        '    });\n'
+        '  } catch { return new NodeResponse(null, { status: 404 }); }\n'
+        '});\n'
+        '\n'
         'var _lazy_l4O20E = defineLazyEventHandler(async () => {\n'
         '  const { default: ssrHandler } = await import("./_ssr/ssr.mjs");\n'
         '  const { default: rendererTemplate } = await import("./_chunks/renderer-template.mjs");\n'
         '  return defineHandler(async (event) => {\n'
+        '    // Serve runtime media files\n'
+        '    if (event.url.pathname.startsWith("/media/")) return mediaHandler(event);\n'
         '    try {\n'
         '      const req = event.req instanceof Request ? event.req : new Request(\n'
         '        "http://" + (event.req.headers.host || "localhost") + event.req.url,\n'
@@ -57,4 +83,4 @@ else:
     if old_handler not in idx:
         print("ERROR: index.mjs pattern not found"); sys.exit(1)
     open(index_path, 'w').write(idx.replace(old_handler, new_handler))
-    print("index.mjs patched — SSR service wired for all routes")
+    print("index.mjs patched — SSR + dynamic media handler wired")
