@@ -138,7 +138,7 @@ async function anthropicLyrics(brief: SongBrief): Promise<string> {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-20241022",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildPrompt(brief) }],
@@ -156,12 +156,19 @@ async function anthropicLyrics(brief: SongBrief): Promise<string> {
  * Priority: Anthropic → AvvalAI → OpenRouter → local template
  */
 export async function draftLyrics(brief: SongBrief): Promise<string> {
-  // 1. Anthropic Claude (best for Persian poetry)
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      return await anthropicLyrics(brief);
-    } catch (e) {
-      console.warn("[lyrics] Anthropic failed:", (e as Error).message);
+  // 1. Anthropic Claude (best for Persian poetry) — try both keys
+  for (const envKey of ["ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY_2"]) {
+    if (process.env[envKey]) {
+      const saved = process.env.ANTHROPIC_API_KEY;
+      if (envKey !== "ANTHROPIC_API_KEY") process.env.ANTHROPIC_API_KEY = process.env[envKey];
+      try {
+        const result = await anthropicLyrics(brief);
+        if (envKey !== "ANTHROPIC_API_KEY") process.env.ANTHROPIC_API_KEY = saved;
+        return result;
+      } catch (e) {
+        if (envKey !== "ANTHROPIC_API_KEY") process.env.ANTHROPIC_API_KEY = saved;
+        console.warn(`[lyrics] Anthropic (${envKey}) failed:`, (e as Error).message);
+      }
     }
   }
 
