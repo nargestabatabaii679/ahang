@@ -30,6 +30,52 @@ import { lipSyncVideo as lipSyncAurora } from "./providers/creatify";
 import { generateAvatarVideo } from "./providers/heygen";
 import { generateCoverArt, animateImage, generateMusicStability } from "./providers/stability";
 import { sleep } from "./server-utils";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { writeFileSync, readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Mix voice (foreground) + instrumental (background) using ffmpeg.
+ * Voice is at full volume; music is attenuated to 25% so vocals are clear.
+ * Returns null if ffmpeg is unavailable — caller falls back to voice-only.
+ */
+async function mixVoiceAndMusic(
+  voiceBytes: Uint8Array,
+  musicBytes: Uint8Array
+): Promise<Uint8Array | null> {
+  const tmp = tmpdir();
+  const voicePath = join(tmp, `mix-voice-${Date.now()}.mp3`);
+  const musicPath = join(tmp, `mix-music-${Date.now()}.mp3`);
+  const outPath   = join(tmp, `mix-out-${Date.now()}.mp3`);
+  try {
+    writeFileSync(voicePath, voiceBytes);
+    writeFileSync(musicPath, musicBytes);
+    // Mix: voice at 100%, instrumental at 25%; trim to voice length; re-encode to mp3
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i", voicePath,
+      "-i", musicPath,
+      "-filter_complex",
+      "[0:a]volume=1.0[v];[1:a]volume=0.25[m];[v][m]amix=inputs=2:duration=first:dropout_transition=2[out]",
+      "-map", "[out]",
+      "-c:a", "libmp3lame",
+      "-q:a", "2",
+      outPath,
+    ]);
+    const result = new Uint8Array(readFileSync(outPath));
+    return result;
+  } catch {
+    return null;
+  } finally {
+    for (const p of [voicePath, musicPath, outPath]) {
+      try { unlinkSync(p); } catch { /* ignore */ }
+    }
+  }
+}
 
 const isMock = () => process.env.PIPELINE_MOCK === "true";
 const musicProvider = () => process.env.MUSIC_PROVIDER || "auto";
@@ -161,12 +207,30 @@ async function runVoiceStage(
         sample,
         mimeFromExt(job.brief.voiceUrl)
       );
+      let vocalBytes: Uint8Array;
       try {
-        const audio = await synthesize(voiceId, lyrics);
-        audioUrl = (await savePublic(`${job.id}-final.mp3`, audio)).url;
+        vocalBytes = await synthesize(voiceId, lyrics);
       } finally {
         await deleteVoice(voiceId);
       }
+
+      // Try to mix vocal with instrumental background
+      let finalBytes: Uint8Array | null = null;
+      if (musicUrl) {
+        try {
+          const musicBytes = await fetchBytes(musicUrl);
+          finalBytes = await mixVoiceAndMusic(vocalBytes, musicBytes);
+          if (finalBytes) {
+            console.log("[pipeline] voice + music mixed successfully");
+          } else {
+            console.warn("[pipeline] ffmpeg not available; using voice-only track");
+          }
+        } catch (mixErr) {
+          console.warn("[pipeline] mix failed:", (mixErr as Error).message);
+        }
+      }
+
+      audioUrl = (await savePublic(`${job.id}-final.mp3`, finalBytes ?? vocalBytes)).url;
     } catch (e) {
       console.warn(
         `[pipeline] voice clone failed (${(e as Error)?.message}); falling back to raw uploaded sample`

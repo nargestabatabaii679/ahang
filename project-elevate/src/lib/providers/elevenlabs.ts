@@ -72,14 +72,14 @@ export async function synthesize(
     process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
 
   // Settings tuned for singing/song delivery:
-  // - stability 0.55: allows natural pitch variation (not robotic)
-  // - similarity_boost 0.80: stays close to the cloned voice
-  // - style 0.40: adds expressive musical styling
-  // - use_speaker_boost: true — enhances clarity and presence
+  // - stability 0.45: more pitch variation for expressive, song-like delivery
+  // - similarity_boost 0.85: stays very close to the cloned voice character
+  // - style 0.65: strong expressive styling for musical/emotional performance
+  // - use_speaker_boost: true — enhances vocal clarity and presence
   const voiceSettings = {
-    stability: 0.55,
-    similarity_boost: 0.80,
-    style: 0.40,
+    stability: 0.45,
+    similarity_boost: 0.85,
+    style: 0.65,
     use_speaker_boost: true,
   };
 
@@ -154,21 +154,28 @@ export async function deleteVoice(voiceId: string) {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /**
- * Insert short pauses between verse lines so the TTS engine breathes
- * naturally — critical for song-like delivery in Persian.
+ * Format lyrics for expressive, song-like TTS delivery.
+ * - Adds pauses between lines so the voice breathes
+ * - Adds longer pauses between stanzas (blank lines)
+ * - Ensures every line ends with punctuation so ElevenLabs knows to pause
  */
 function prepareForSinging(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => {
-      const t = line.trim();
-      if (!t) return "";
-      // End each lyric line with a short pause so the voice breathes
-      return t.endsWith("،") || t.endsWith(".") || t.endsWith("!") || t.endsWith("؟")
-        ? t
-        : t + " ...";
-    })
-    .join("\n");
+  const lines = text.split("\n");
+  const result: string[] = [];
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      // blank line = section break → emit an explicit pause marker
+      result.push("...");
+      continue;
+    }
+    // End each lyric line with ellipsis pause if no punctuation already
+    const hasPunct = /[،.!؟,]$/.test(line);
+    result.push(hasPunct ? line : line + "،");
+  }
+
+  return result.join("\n");
 }
 
 function extFromMime(mime: string) {
