@@ -38,3 +38,7 @@ public/media/
 *.njsproj
 *.sln
 *.sw?
+
+# Local media files (runtime-generated, served from disk mount on Liara)
+media/
+data/
