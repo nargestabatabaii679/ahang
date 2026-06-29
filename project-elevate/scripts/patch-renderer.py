@@ -46,9 +46,15 @@ else:
     lazy_var = m.group(2)   # e.g. _lazy_l4O20E or whatever the build produced
     new_handler = (
         '// Dynamic media file server for runtime-generated files\n'
-        'import { createReadStream, statSync } from "node:fs";\n'
+        'import { createReadStream, statSync, mkdirSync as _mkdirSync } from "node:fs";\n'
         'import { join as pathJoin, extname } from "node:path";\n'
-        'var RUNTIME_MEDIA_DIR = process.env.MEDIA_DIR || pathJoin(process.cwd(), "media");\n'
+        'var RUNTIME_MEDIA_DIR = (() => {\n'
+        '  for (const d of [process.env.MEDIA_DIR, pathJoin(process.cwd(),"media"), "/tmp/media"]) {\n'
+        '    if (!d) continue;\n'
+        '    try { _mkdirSync(d, { recursive: true }); return d; } catch {}\n'
+        '  }\n'
+        '  return "/tmp/media";\n'
+        '})();\n'
         'var MIME = { ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",\n'
         '  ".gif":"image/gif",".mp3":"audio/mpeg",".wav":"audio/wav",".ogg":"audio/ogg",\n'
         '  ".webm":"audio/webm",".m4a":"audio/mp4",".mp4":"video/mp4",".flac":"audio/flac",\n'

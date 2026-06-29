@@ -7,12 +7,28 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
-// MEDIA_DIR: env var (set in Liara panel) → /app/media (disk mount)
-// Default: <cwd>/media — on Liara cwd=/app so this becomes /app/media automatically
-const MEDIA_DIR = process.env.MEDIA_DIR ?? join(process.cwd(), "media");
-const MEDIA_URL_PREFIX = "/media";
+// MEDIA_DIR priority: env var → <cwd>/media → /tmp/media (always writable fallback)
+function resolveMediaDir(): string {
+  const candidates = [
+    process.env.MEDIA_DIR,
+    join(process.cwd(), "media"),
+    "/tmp/media",
+  ];
+  for (const dir of candidates) {
+    if (!dir) continue;
+    try {
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch {
+      // try next
+    }
+  }
+  return "/tmp/media";
+}
 
-mkdirSync(MEDIA_DIR, { recursive: true });
+const MEDIA_DIR = resolveMediaDir();
+const MEDIA_URL_PREFIX = "/media";
+console.log("[storage] MEDIA_DIR =", MEDIA_DIR);
 
 function contentTypeFromName(name: string): string {
   const ext = name.toLowerCase().split(".").pop() || "";
