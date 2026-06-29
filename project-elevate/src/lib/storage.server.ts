@@ -7,8 +7,9 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
-// Support DATA_DIR env var for Liara disk mounts; fallback to cwd-relative
-const MEDIA_DIR = process.env.MEDIA_DIR ?? join(process.cwd(), "public", "media");
+// MEDIA_DIR: env var (set in Liara panel) → /app/media (disk mount)
+// Default: <cwd>/media — on Liara cwd=/app so this becomes /app/media automatically
+const MEDIA_DIR = process.env.MEDIA_DIR ?? join(process.cwd(), "media");
 const MEDIA_URL_PREFIX = "/media";
 
 mkdirSync(MEDIA_DIR, { recursive: true });

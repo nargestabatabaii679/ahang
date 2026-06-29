@@ -48,7 +48,7 @@ else:
         '// Dynamic media file server for runtime-generated files\n'
         'import { createReadStream, statSync } from "node:fs";\n'
         'import { join as pathJoin, extname } from "node:path";\n'
-        'var RUNTIME_MEDIA_DIR = process.env.MEDIA_DIR || pathJoin(process.cwd(), "public", "media");\n'
+        'var RUNTIME_MEDIA_DIR = process.env.MEDIA_DIR || pathJoin(process.cwd(), "media");\n'
         'var MIME = { ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",\n'
         '  ".gif":"image/gif",".mp3":"audio/mpeg",".wav":"audio/wav",".ogg":"audio/ogg",\n'
         '  ".webm":"audio/webm",".m4a":"audio/mp4",".mp4":"video/mp4",".flac":"audio/flac",\n'

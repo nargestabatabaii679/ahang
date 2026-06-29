@@ -35,6 +35,14 @@ const isMock = () => process.env.PIPELINE_MOCK === "true";
 const musicProvider = () => process.env.MUSIC_PROVIDER || "auto";
 const videoProvider = () => process.env.VIDEO_PROVIDER || "aurora";
 
+// Convert relative /media/... URLs to absolute for external APIs (Creatify, HeyGen)
+function toAbsoluteUrl(relOrAbsUrl: string): string {
+  if (!relOrAbsUrl || relOrAbsUrl.startsWith("http")) return relOrAbsUrl;
+  const base = (process.env.PUBLIC_URL || process.env.SITE_URL || "").replace(/\/$/, "");
+  if (!base) throw new Error("PUBLIC_URL env var must be set for video generation (e.g. https://aimusics.liara.run)");
+  return base + relOrAbsUrl;
+}
+
 interface MusicStageResult {
   musicUrl?: string;
   coverArtUrl?: string;
@@ -187,7 +195,7 @@ async function runVideoStage(
         const buf = await generateAvatarVideo(lyrics);
         videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
       } else if (photoUrl && audioUrl && videoProvider() === "aurora") {
-        const buf = await lipSyncAurora(photoUrl, audioUrl);
+        const buf = await lipSyncAurora(toAbsoluteUrl(photoUrl), toAbsoluteUrl(audioUrl));
         videoUrl = (await savePublic(`${job.id}-video.mp4`, buf, "video/mp4")).url;
       } else if (videoProvider() === "stability" && process.env.STABILITY_API_KEY) {
         // Animate the cover art (or uploaded photo) with Stable Video Diffusion
