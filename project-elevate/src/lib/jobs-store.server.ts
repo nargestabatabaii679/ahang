@@ -5,13 +5,35 @@
  */
 
 import Database from "better-sqlite3";
-import { mkdirSync } from "fs";
+import { mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { Job, JobStatus, StageId, StageStatus, STAGE_ORDER } from "./types";
 
-// Support DATA_DIR env var for Liara disk mounts; fallback to cwd-relative
-const DB_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
-mkdirSync(DB_DIR, { recursive: true });
+// DATA_DIR priority: env var → <cwd>/data → /tmp/data (always writable fallback)
+function resolveDataDir(): string {
+  const candidates = [
+    process.env.DATA_DIR,
+    join(process.cwd(), "data"),
+    "/tmp/data",
+  ];
+  for (const dir of candidates) {
+    if (!dir) continue;
+    try {
+      mkdirSync(dir, { recursive: true });
+      // Verify we can actually write (not a read-only mount)
+      const testFile = join(dir, ".write-test");
+      writeFileSync(testFile, "");
+      unlinkSync(testFile);
+      console.log("[jobs-store] DATA_DIR =", dir);
+      return dir;
+    } catch {
+      // try next
+    }
+  }
+  return "/tmp/data";
+}
+
+const DB_DIR = resolveDataDir();
 const DB_PATH = join(DB_DIR, "jobs.db");
 
 let _db: Database.Database | null = null;
