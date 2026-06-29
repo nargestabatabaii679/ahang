@@ -56,6 +56,19 @@ export async function cloneVoice(
   return json.voice_id;
 }
 
+// Per-genre voice settings — different genres need different delivery styles
+type VoiceSettings = { stability: number; similarity_boost: number; style: number; use_speaker_boost: boolean };
+
+const genreVoiceSettings: Record<string, VoiceSettings> = {
+  romantic:     { stability: 0.40, similarity_boost: 0.88, style: 0.70, use_speaker_boost: true },
+  emotional:    { stability: 0.35, similarity_boost: 0.90, style: 0.75, use_speaker_boost: true },
+  happy:        { stability: 0.55, similarity_boost: 0.80, style: 0.60, use_speaker_boost: true },
+  calm:         { stability: 0.60, similarity_boost: 0.85, style: 0.45, use_speaker_boost: false },
+  motivational: { stability: 0.45, similarity_boost: 0.82, style: 0.72, use_speaker_boost: true },
+  nostalgic:    { stability: 0.38, similarity_boost: 0.88, style: 0.68, use_speaker_boost: true },
+  default:      { stability: 0.45, similarity_boost: 0.85, style: 0.65, use_speaker_boost: true },
+};
+
 // ── Text-to-Speech (singing-optimised) ───────────────────────────────────
 
 export async function synthesize(
@@ -63,25 +76,12 @@ export async function synthesize(
   text: string,
   opts?: { genre?: string }
 ): Promise<Uint8Array> {
-  // Prepare text: add breathing markers for better musical delivery
   const preparedText = prepareForSinging(text);
 
-  // Model: eleven_multilingual_v2 is best for Persian and supports
-  // expressive singing-like delivery
-  const modelId =
-    process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+  // eleven_multilingual_v2: best model for Persian — supports expressive emotional delivery
+  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
 
-  // Settings tuned for singing/song delivery:
-  // - stability 0.45: more pitch variation for expressive, song-like delivery
-  // - similarity_boost 0.85: stays very close to the cloned voice character
-  // - style 0.65: strong expressive styling for musical/emotional performance
-  // - use_speaker_boost: true — enhances vocal clarity and presence
-  const voiceSettings = {
-    stability: 0.45,
-    similarity_boost: 0.85,
-    style: 0.65,
-    use_speaker_boost: true,
-  };
+  const voiceSettings = genreVoiceSettings[opts?.genre ?? "default"] ?? genreVoiceSettings.default;
 
   const res = await fetch(
     `${api()}/text-to-speech/${voiceId}?output_format=mp3_44100_192`,
@@ -96,7 +96,6 @@ export async function synthesize(
         text: preparedText,
         model_id: modelId,
         voice_settings: voiceSettings,
-        // Optimise for song delivery
         apply_text_normalization: "auto",
       }),
     }
@@ -126,9 +125,9 @@ export async function generateMusicEL(
     },
     body: JSON.stringify({
       text: prompt,
-      duration_seconds: Math.min(durationSeconds, 22), // max 22s per call
-      prompt_influence: 0.35, // 0=more creative, 1=strict. 0.35 = good balance
-      output_format: "mp3_44100_128",
+      duration_seconds: Math.min(durationSeconds, 22),
+      prompt_influence: 0.50, // 0=creative, 1=strict — 0.5 balances quality & fidelity
+      output_format: "mp3_44100_192",
     }),
   });
 
@@ -155,27 +154,33 @@ export async function deleteVoice(voiceId: string) {
 
 /**
  * Format lyrics for expressive, song-like TTS delivery.
- * - Adds pauses between lines so the voice breathes
- * - Adds longer pauses between stanzas (blank lines)
- * - Ensures every line ends with punctuation so ElevenLabs knows to pause
+ * Groups lines into stanzas separated by blank lines.
+ * Each line gets trailing punctuation so ElevenLabs pauses naturally.
+ * Blank lines become a longer pause marker so stanza breaks breathe.
  */
 function prepareForSinging(text: string): string {
   const lines = text.split("\n");
   const result: string[] = [];
+  let blankCount = 0;
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) {
-      // blank line = section break → emit an explicit pause marker
-      result.push("...");
+      blankCount++;
+      // First blank line after content = stanza break (long pause)
+      // Multiple blanks collapse to one
+      if (blankCount === 1) {
+        result.push("");
+      }
       continue;
     }
-    // End each lyric line with ellipsis pause if no punctuation already
-    const hasPunct = /[،.!؟,]$/.test(line);
+    blankCount = 0;
+    // Ensure each line ends with pause-inducing punctuation
+    const hasPunct = /[،.!؟,،…]$/.test(line);
     result.push(hasPunct ? line : line + "،");
   }
 
-  return result.join("\n");
+  return result.join("\n").trim();
 }
 
 function extFromMime(mime: string) {

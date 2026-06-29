@@ -209,7 +209,7 @@ async function runVoiceStage(
       );
       let vocalBytes: Uint8Array;
       try {
-        vocalBytes = await synthesize(voiceId, lyrics);
+        vocalBytes = await synthesize(voiceId, lyrics, { genre: job.brief.genre });
       } finally {
         await deleteVoice(voiceId);
       }
