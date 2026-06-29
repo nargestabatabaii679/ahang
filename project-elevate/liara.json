@@ -5,9 +5,9 @@
   "node": {
     "version": 22
   },
-  "start": "HOST=0.0.0.0 PORT=3000 NITRO_HOST=0.0.0.0 NITRO_PORT=3000 NODE_ENV=production DATA_DIR=/app/data MEDIA_DIR=/app/public/media node .output/server/index.mjs",
+  "start": "HOST=0.0.0.0 PORT=3000 NITRO_HOST=0.0.0.0 NITRO_PORT=3000 NODE_ENV=production DATA_DIR=/app/data MEDIA_DIR=/app/media node .output/server/index.mjs",
   "disks": [
     { "name": "songai-data",  "mountTo": "/app/data" },
-    { "name": "songai-media", "mountTo": "/app/public/media" }
+    { "name": "songai-media", "mountTo": "/app/media" }
   ]
 }
