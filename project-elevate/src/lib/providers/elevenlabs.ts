@@ -15,6 +15,14 @@ function key() {
   return k;
 }
 
+function authHeaders(): Record<string, string> {
+  const k = key();
+  if (k.startsWith("sk_")) {
+    return { "Authorization": `Bearer ${k}` };
+  }
+  return { "xi-api-key": k };
+}
+
 // ── Voice Cloning ─────────────────────────────────────────────────────────
 
 export async function cloneVoice(
@@ -39,7 +47,7 @@ export async function cloneVoice(
 
   const res = await fetch(`${api()}/voices/add`, {
     method: "POST",
-    headers: { "xi-api-key": key() },
+    headers: { ...authHeaders() },
     body: form,
   });
   if (!res.ok)
@@ -80,7 +88,7 @@ export async function synthesize(
     {
       method: "POST",
       headers: {
-        "xi-api-key": key(),
+        ...authHeaders(),
         "Content-Type": "application/json",
         Accept: "audio/mpeg",
       },
@@ -112,7 +120,7 @@ export async function generateMusicEL(
   const res = await fetch(`${api()}/sound-generation`, {
     method: "POST",
     headers: {
-      "xi-api-key": key(),
+      ...authHeaders(),
       "Content-Type": "application/json",
       Accept: "audio/mpeg",
     },
@@ -136,7 +144,7 @@ export async function deleteVoice(voiceId: string) {
   try {
     await fetch(`${api()}/voices/${voiceId}`, {
       method: "DELETE",
-      headers: { "xi-api-key": key() },
+      headers: { ...authHeaders() },
     });
   } catch {
     /* non-fatal */
