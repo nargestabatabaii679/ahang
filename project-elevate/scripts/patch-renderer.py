@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys
+import os, sys, re
 
 assets_dir = ".output/public/assets"
 if not os.path.isdir(assets_dir):
@@ -33,7 +33,17 @@ idx = open(index_path).read()
 if "ssrHandler" in idx:
     print("index.mjs already patched with SSR handler")
 else:
-    old_handler = 'var _lazy_l4O20E = defineLazyEventHandler(() => import("./_chunks/renderer-template.mjs"));'
+    # Match: var <anyname> = defineLazyEventHandler(() => import("./_chunks/renderer-template.mjs"));
+    # The variable name is a hash that may differ between environments.
+    pattern = re.compile(
+        r'(var\s+(\S+)\s*=\s*defineLazyEventHandler\(\(\)\s*=>\s*import\("\./_chunks/renderer-template\.mjs"\)\);)'
+    )
+    m = pattern.search(idx)
+    if not m:
+        # Dump first 3000 chars to help debug
+        print("ERROR: index.mjs pattern not found. First 3000 chars:"); print(idx[:3000]); sys.exit(1)
+    old_handler = m.group(1)
+    lazy_var = m.group(2)   # e.g. _lazy_l4O20E or whatever the build produced
     new_handler = (
         '// Dynamic media file server for runtime-generated files\n'
         'import { createReadStream, statSync } from "node:fs";\n'
@@ -59,11 +69,10 @@ else:
         '  } catch { return new NodeResponse(null, { status: 404 }); }\n'
         '});\n'
         '\n'
-        'var _lazy_l4O20E = defineLazyEventHandler(async () => {\n'
+        + f'var {lazy_var} = defineLazyEventHandler(async () => {{\n'
         '  const { default: ssrHandler } = await import("./_ssr/ssr.mjs");\n'
         '  const { default: rendererTemplate } = await import("./_chunks/renderer-template.mjs");\n'
         '  return defineHandler(async (event) => {\n'
-        '    // Serve runtime media files\n'
         '    if (event.url.pathname.startsWith("/media/")) return mediaHandler(event);\n'
         '    try {\n'
         '      const req = event.req instanceof Request ? event.req : new Request(\n'
@@ -80,7 +89,5 @@ else:
         '  });\n'
         '});'
     )
-    if old_handler not in idx:
-        print("ERROR: index.mjs pattern not found"); sys.exit(1)
     open(index_path, 'w').write(idx.replace(old_handler, new_handler))
-    print("index.mjs patched — SSR + dynamic media handler wired")
+    print("index.mjs patched — SSR + dynamic media handler wired (var: " + lazy_var + ")")
