@@ -63,10 +63,10 @@ export async function cloneVoice(
 ): Promise<string> {
   return withRetry("cloneVoice", async () => {
     const form = new FormData();
-    // Sanitise name: ElevenLabs allows max 40 chars, Latin + Unicode
+    // ElevenLabs: max 40 chars for name
     const safeName = (name.trim().slice(0, 38) || "songai-voice");
     form.append("name", safeName);
-    form.append("description", "Cloned for a personal Persian gift song via SongAI");
+    // Only required fields — description/labels cause 400 on some account tiers
 
     const ab = sample.buffer.slice(
       sample.byteOffset,
@@ -77,8 +77,6 @@ export async function cloneVoice(
       new Blob([ab], { type: sampleMime }),
       "sample" + extFromMime(sampleMime)
     );
-    // labels help ElevenLabs choose the right accent model
-    form.append("labels", JSON.stringify({ language: "fa", use_case: "song" }));
 
     const res = await fetch(`${api()}/voices/add`, {
       method: "POST",

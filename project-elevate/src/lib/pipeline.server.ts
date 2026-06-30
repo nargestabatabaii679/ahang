@@ -264,15 +264,16 @@ async function runVoiceStage(
   job: Job,
   lyrics: string,
   musicUrl?: string
-): Promise<string | undefined> {
+): Promise<{ audioUrl?: string; voiceError?: string }> {
   await setStage(job.id, "voice", "running");
   let audioUrl: string | undefined;
+  let voiceError: string | undefined;
 
   if (isMock()) {
     audioUrl = job.brief.voiceUrl || musicUrl;
     await sleep(1200);
     await setStage(job.id, "voice", "done");
-    return audioUrl;
+    return { audioUrl };
   }
 
   // Quality gate: voice sample must exist
@@ -280,7 +281,7 @@ async function runVoiceStage(
     console.warn("[pipeline:voice] no voice sample — using music as final audio");
     audioUrl = musicUrl;
     await setStage(job.id, "voice", "done");
-    return audioUrl;
+    return { audioUrl };
   }
 
   let voiceId: string | null = null;
@@ -325,7 +326,8 @@ async function runVoiceStage(
     console.log(`[pipeline:voice] final audio saved: ${audioUrl}`);
   } catch (e) {
     const msg = (e as Error).message;
-    console.error(`[pipeline:voice] failed: ${msg}`);
+    console.error(`[pipeline:voice] CLONE FAILED: ${msg}`);
+    voiceError = `کلون صدا انجام نشد: ${msg}`;
     // Graceful degradation: use the raw uploaded sample
     audioUrl = job.brief.voiceUrl || musicUrl;
     console.warn("[pipeline:voice] falling back to raw uploaded sample");
@@ -335,7 +337,7 @@ async function runVoiceStage(
   }
 
   await setStage(job.id, "voice", "done");
-  return audioUrl;
+  return { audioUrl, voiceError };
 }
 
 // ── Stage: Video ──────────────────────────────────────────────────────────
@@ -408,12 +410,12 @@ export async function runPipeline(jobId: string) {
     await updateJob(job.id, { result });
 
     // ── Stage 3: Voice Clone + TTS + Mix ──
-    const audioUrl = await runVoiceStage(job, lyrics, music.musicUrl);
-    result = { ...result, audioUrl };
+    const voice = await runVoiceStage(job, lyrics, music.musicUrl);
+    result = { ...result, audioUrl: voice.audioUrl, voiceError: voice.voiceError };
     await updateJob(job.id, { result });
 
     // ── Stage 4: Video (optional) ──
-    const videoUrl = await runVideoStage(job, audioUrl);
+    const videoUrl = await runVideoStage(job, voice.audioUrl);
     result = { ...result, videoUrl };
     await updateJob(job.id, { result });
 

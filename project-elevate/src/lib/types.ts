@@ -80,6 +80,7 @@ export interface Job {
     audioUrl?: string;
     musicUrl?: string;
     musicError?: string;
+    voiceError?: string;
     lyrics?: string;
     coverArtUrl?: string;
   };
